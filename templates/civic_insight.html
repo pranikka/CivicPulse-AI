@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Civic Insight Summary - CivicPulse AI{% endblock %}
+{% block content %}
+<div class="page-header"><h1>Civic Insight Summary</h1><p>AI-assisted summary grounded in the selected CivicPulse records.</p></div>
+<div class="container">
+<div class="chart-card"><form method="get" class="filter-form"><input class="filter-input" name="area" value="{{ area }}" placeholder="Area / district"><input class="filter-input" name="category" value="{{ category }}" placeholder="Category"><select class="filter-input" name="period"><option value="7d">7 days</option><option value="30d" {% if period=='30d' %}selected{% endif %}>30 days</option><option value="90d">90 days</option><option value="365d">1 year</option></select><button class="btn btn-primary">Generate</button></form></div>
+<div class="chart-card"><h2>What citizens are reporting</h2><ul>{% for name,count in summary.what_citizens_report %}<li><strong>{{ name }}</strong>: {{ count }} requests</li>{% else %}<li>Not enough data.</li>{% endfor %}</ul>
+<h2>Where demand is concentrated</h2><ul>{% for name,count in summary.demand_concentration %}<li>{{ name }} — {{ count }}</li>{% else %}<li>Not enough data.</li>{% endfor %}</ul>
+<h2>Unresolved issues</h2><p>{{ summary.unresolved }}</p>
+<h2>Existing projects</h2>{% if summary.existing_projects %}<table><tr><th>Project</th><th>Category</th><th>Status</th></tr>{% for p in summary.existing_projects %}<tr><td>{{ p.title }}</td><td>{{ p.category }}</td><td>{{ p.status }}</td></tr>{% endfor %}</table>{% else %}<p>Not enough project data.</p>{% endif %}
+<h2>What requires human review</h2><p>Validate demand patterns, project context, data coverage and all recommendations before government action.</p>
+<p class="review-note">AI-generated summary • Verify with source data.</p></div>
+<div class="chart-card"><h2>Data coverage limitation</h2><p>{{ summary.coverage.coverage_note }}</p><p>Records: {{ summary.coverage.records }}. Date coverage: {{ summary.coverage.date_min or '—' }} to {{ summary.coverage.date_max or '—' }}.</p></div>
+</div>{% endblock %}

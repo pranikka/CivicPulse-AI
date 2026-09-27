@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}CivicPulse AI - Turning Citizen Voices into Smarter Public Development{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block head_extra %}{% endblock %}
+</head>
+<body class="{% if current_user.is_authenticated and current_user.role in ('Citizen','Officer','Admin') %}has-role-sidebar{% endif %}">
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="navbar-container">
+            <div class="navbar-brand">
+                <a href="/">
+                    <span class="brand-icon">🏛️</span>
+                    <span class="brand-text">CivicPulse AI</span>
+                </a>
+            </div>
+            
+            <button class="hamburger" id="hamburger">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+            
+            <div class="nav-menu" id="navMenu">
+                <div class="nav-links">
+                    {% if current_user.is_authenticated %}
+                        <a href="/citizen/track" class="nav-link">Track Complaint</a>
+                        <a href="#" class="nav-link" id="notificationBell" onclick="return openNotifications(event)">🔔 <span id="notificationCount"></span></a>
+                    {% else %}
+                        <a href="/" class="nav-link">Home</a><a href="/trust-center" class="nav-link">Trust Center</a><a href="/public-transparency" class="nav-link">Transparency</a>
+                    {% endif %}
+                    <span class="language-switcher" aria-label="Language"><a href="{{ url_for('set_language', lang='en') }}" class="nav-link {% if language == 'en' %}active{% endif %}">English</a><span aria-hidden="true">|</span><a href="{{ url_for('set_language', lang='ta') }}" class="nav-link {% if language == 'ta' %}active{% endif %}">தமிழ்</a></span>
+                    {% if current_user.is_authenticated %}<a href="/auth/logout" class="nav-link nav-logout">Logout</a>{% else %}<a href="/auth/register" class="nav-link">Register</a><a href="/auth/login" class="nav-link nav-login">Login</a>{% endif %}
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    {% if current_user.is_authenticated and current_user.role in ('Citizen','Officer','Admin') %}
+    <aside class="role-sidebar" aria-label="{{ current_user.role }} navigation">
+        <div class="sidebar-title">{{ current_user.role }} Navigation</div>
+        {% if current_user.role == 'Citizen' %}
+            <a href="/citizen/dashboard" class="{% if request.path == '/citizen/dashboard' %}active{% endif %}">📊 Dashboard</a>
+            <a href="/citizen/track" class="{% if request.path == '/citizen/track' %}active{% endif %}">📍 Track Complaint</a>
+            <a href="/citizen/request" class="{% if request.path == '/citizen/request' %}active{% endif %}">📝 Submit Request</a>
+            <a href="/citizen/analysis" class="{% if request.path == '/citizen/analysis' %}active{% endif %}">📂 My Requests</a>
+            <a href="/citizen/profile" class="{% if request.path == '/citizen/profile' %}active{% endif %}">👤 Profile</a>
+        {% elif current_user.role == 'Officer' %}
+            <a href="/officer/dashboard" class="{% if request.path == '/officer/dashboard' %}active{% endif %}">📊 Dashboard</a>
+            <a href="/officer/complaints" class="{% if request.path == '/officer/complaints' %}active{% endif %}">📋 Track Complaints</a>
+            <a href="/officer/hotspots" class="{% if request.path == '/officer/hotspots' %}active{% endif %}">📍 Hotspots</a>
+            <a href="/impact-dashboard" class="{% if request.path == '/impact-dashboard' %}active{% endif %}">📈 Impact</a>
+            <a href="#" onclick="return openNotifications(event)">🔔 Notifications</a>
+            <a href="/officer/demand-analysis" class="{% if request.path == '/officer/demand-analysis' %}active{% endif %}">🧠 Data Intelligence</a>
+            <a href="/civic-insight" class="{% if request.path == '/civic-insight' %}active{% endif %}">💡 Civic Insight</a>
+            <a href="/outcomes" class="{% if request.path == '/outcomes' %}active{% endif %}">✅ Outcomes</a>
+            <a href="/officer/demand-analysis#advancedFilterForm">📊 Analytics</a>
+        {% else %}
+            <a href="/admin/dashboard" class="{% if request.path == '/admin/dashboard' %}active{% endif %}">📊 Dashboard</a>
+            <a href="/admin/complaints" class="{% if request.path == '/admin/complaints' %}active{% endif %}">📋 Complaint Management</a>
+            <a href="/admin/departments" class="{% if request.path.startswith('/admin/departments') %}active{% endif %}">🏛️ Departments</a>
+            <a href="/admin/sla" class="{% if request.path == '/admin/sla' %}active{% endif %}">⏱️ SLA Management</a>
+            <a href="/admin/audit-log" class="{% if request.path == '/admin/audit-log' %}active{% endif %}">🔎 Audit Log</a>
+            <a href="/admin/data-governance" class="{% if request.path == '/admin/data-governance' %}active{% endif %}">🛡️ Data Governance</a>
+            <a href="/admin/data-quality" class="{% if request.path == '/admin/data-quality' %}active{% endif %}">🧪 Data Quality</a>
+            <a href="/civic-insight" class="{% if request.path == '/civic-insight' %}active{% endif %}">💡 Civic Insight</a>
+            <a href="/outcomes" class="{% if request.path == '/outcomes' %}active{% endif %}">✅ Outcomes</a>
+        {% endif %}
+        <a href="/auth/logout" class="sidebar-logout">↪ Logout</a>
+    </aside>
+    {% endif %}
+
+    <!-- Flash Messages -->
+    <div class="flash-container" id="flashContainer">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'success' if category == 'success' else 'error' if category == 'error' else 'info' }} alert-dismissible" role="alert">
+                        <span class="alert-message">{{ message }}</span>
+                        <button class="alert-close" onclick="this.parentElement.remove()">×</button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <div id="notificationPanel" style="display:none; position:fixed; right:20px; top:75px; z-index:1000; max-width:380px; width:calc(100% - 40px); background:#fff; border:1px solid #ddd; border-radius:10px; box-shadow:0 8px 30px rgba(0,0,0,.15); padding:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+            <strong>Notifications</strong>
+            <button class="btn btn-sm btn-outline" onclick="markAllNotificationsRead()">Mark all read</button>
+        </div>
+        <div id="notificationList" style="margin-top:10px;max-height:420px;overflow:auto;"></div>
+    </div>
+
+    <!-- AI Civic Assistant -->
+    <button type="button" class="civic-assistant-launcher" id="civicAssistantLauncher" aria-label="Open Civic Assistant" aria-controls="civicAssistantPanel" aria-expanded="false">💬</button>
+    <section class="civic-assistant-panel" id="civicAssistantPanel" aria-label="Civic Assistant" hidden>
+        <div class="civic-assistant-header">
+            <strong>CivicPulse AI Assistant</strong>
+            <button type="button" class="assistant-close" id="civicAssistantClose" aria-label="Close" title="Close">×</button>
+        </div>
+        <div class="civic-assistant-messages" id="civicAssistantMessages">
+            <div class="assistant-message">How can I help you?</div>
+        </div>
+        <form id="civicAssistantForm" class="civic-assistant-form">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            <input id="civicAssistantInput" maxlength="1000" autocomplete="off" placeholder="Ask about complaints, tracking or services..." required>
+            <button class="btn btn-primary btn-sm" type="submit">Send</button>
+        </form>
+    </section>
+
+    <!-- Main Content -->
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-container">
+            <div class="footer-section">
+                <h4>About CivicPulse AI</h4>
+                <p>Turning citizen voices into smarter public development through data-driven insights and human oversight.</p>
+            </div>
+            
+            <div class="footer-section">
+                <h4>Quick Links</h4>
+                <ul>
+                    <li><a href="/">Home</a></li>
+                    <li><a href="#about">About</a></li>
+                    <li><a href="#contact">Contact</a></li>
+                </ul>
+            </div>
+            
+            <div class="footer-section">
+                <h4>For Citizens</h4>
+                <ul>
+                    <li><a href="/auth/register">Register</a></li>
+                    <li><a href="/auth/login">Login</a></li>
+                    <li><a href="/citizen/request">Submit a Request</a></li>
+                </ul>
+            </div>
+            
+            <div class="footer-section">
+                <h4>For Government</h4>
+                <ul>
+                    <li><a href="/auth/register">Officer Registration</a></li>
+                    <li><a href="/auth/login">Officer Login</a></li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="footer-bottom">
+            <p>&copy; 2026 CivicPulse AI. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+    // Attach the server-generated CSRF token to same-origin state-changing fetch requests.
+    (function () {
+        const csrfToken = {{ csrf_token|tojson }};
+        const nativeFetch = window.fetch.bind(window);
+        window.fetch = function (input, init = {}) {
+            const method = String(init.method || (input && input.method) || 'GET').toUpperCase();
+            if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+                const headers = new Headers(init.headers || {});
+                if (!headers.has('X-CSRFToken')) headers.set('X-CSRFToken', csrfToken);
+                init.headers = headers;
+            }
+            return nativeFetch(input, init);
+        };
+    })();
+    </script>
+
+    <script>
+    async function loadNotifications() {
+        try {
+            const r = await fetch('/api/notifications');
+            if (!r.ok) return;
+            const data = await r.json();
+            const count = document.getElementById('notificationCount');
+            if (count) count.textContent = data.unread_count ? `(${data.unread_count})` : '';
+            const list = document.getElementById('notificationList');
+            if (list) {
+                list.innerHTML = data.notifications.length ? data.notifications.map(n => `
+                    <div style="padding:10px;border-bottom:1px solid #eee;${n.is_read ? '' : 'font-weight:600;'}">
+                        <div>${escapeNotificationText(n.title)}</div>
+                        <small>${escapeNotificationText(n.message)}</small>
+                        <div><small>${n.created_at ? new Date(n.created_at).toLocaleString() : ''}</small></div>
+                        ${n.request_id ? `<a href="/citizen/complaint/${encodeURIComponent(n.request_id)}" onclick="markNotificationRead(${n.id})">View complaint</a>` : ''}
+                    </div>`).join('') : '<p>No notifications.</p>';
+            }
+        } catch (e) { console.warn('Notification load failed', e); }
+    }
+    function escapeNotificationText(v) {
+        return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+    function openNotifications(event) {
+        event.preventDefault();
+        const panel = document.getElementById('notificationPanel');
+        if (panel) {
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+            loadNotifications();
+        }
+        return false;
+    }
+    async function markNotificationRead(id) {
+        await fetch(`/api/notifications/${id}/read`, {method:'POST', headers:{'X-CSRFToken':'{{ csrf_token }}'}});
+        loadNotifications();
+    }
+    async function markAllNotificationsRead() {
+        await fetch('/api/notifications/read-all', {method:'POST', headers:{'X-CSRFToken':'{{ csrf_token }}'}});
+        loadNotifications();
+    }
+    document.addEventListener('DOMContentLoaded', loadNotifications);
+    </script>
+    <script src="{{ url_for('static', filename='js/i18n.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/civic-assistant.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

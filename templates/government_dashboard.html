@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Government Dashboard - CivicPulse AI{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Government Dashboard</h1>
+    <p>From Data to Development Priorities</p>
+</div>
+<div class="container">
+    <div class="priority-section">
+        <h2>Priority Areas for Intervention</h2>
+        <p class="form-hint">These are data-derived attention signals from stored citizen requests. They are not automatic government decisions.</p>
+        <div class="priority-cards">
+        {% for item in priority_areas %}
+            <div class="priority-card {% if item.high > 0 %}priority-high{% else %}priority-moderate{% endif %}">
+                <div class="priority-rank">{{ loop.index }}</div>
+                <h3>{{ item.category }}</h3>
+                <p class="priority-location">{{ item.district }}, {{ item.state }}</p>
+                <div class="priority-metrics">
+                    <div class="metric"><span class="metric-label">Citizen Requests</span><span class="metric-value">{{ item.requests }}</span></div>
+                    <div class="metric"><span class="metric-label">High/Critical</span><span class="metric-value">{{ item.high }}</span></div>
+                    <div class="metric"><span class="metric-label">Unresolved</span><span class="metric-value">{{ item.unresolved }}</span></div>
+                </div>
+                <div class="priority-recommendation">
+                    <h4>AI Recommendation</h4>
+                    <p>{{ item.recommendation }}</p>
+                    <p class="review-note">🔍 AI-generated recommendation • Human review required</p>
+                </div>
+            </div>
+        {% else %}
+            <div class="chart-card"><p>No citizen-request data is available for the current officer scope.</p></div>
+        {% endfor %}
+        </div>
+    </div>
+
+ 
+    <div class="dashboard-stats" style="margin-top:24px;">
+        <div class="stat-card"><div class="stat-content"><div class="stat-value" id="gTotal">—</div><div class="stat-label">Total Requests</div></div></div>
+        <div class="stat-card"><div class="stat-content"><div class="stat-value" id="gActive">—</div><div class="stat-label">Active Requests</div></div></div>
+        <div class="stat-card"><div class="stat-content"><div class="stat-value" id="gHigh">—</div><div class="stat-label">High/Critical</div></div></div>
+        <div class="stat-card"><div class="stat-content"><div class="stat-value" id="gResolved">—</div><div class="stat-label">Resolved</div></div></div>
+        <div class="stat-card"><div class="stat-content"><div class="stat-value" id="gOverdue">—</div><div class="stat-label">Overdue / SLA</div></div></div>
+        <div class="stat-card"><div class="stat-content"><div class="stat-value" id="gSla">—</div><div class="stat-label">SLA Compliance</div></div></div>
+        <div class="stat-card"><div class="stat-content"><div class="stat-value" id="gSatisfaction">—</div><div class="stat-label">Citizen Satisfaction</div></div></div>
+    </div>
+    <div class="dashboard-grid" style="margin-top:24px;">
+        <div class="chart-card"><h2>Emerging Issues</h2><div id="gEmerging">Loading...</div></div>
+        <div class="chart-card"><h2>Department Performance</h2><div id="gDepartments">Loading...</div></div>
+    </div>
+    <div class="dashboard-grid" style="margin-top:24px;">
+        <div class="chart-card"><h2>Development Insights</h2><p>Compare citizen demand with recorded projects and identify potential development attention areas.</p><a class="btn btn-primary" href="{{ url_for('outcomes') }}">Open Outcome Intelligence</a></div>
+        <div class="chart-card"><h2>Trust & Governance</h2><p>Review the responsible-AI and data-governance controls behind the platform.</p><a class="btn btn-secondary" href="{{ url_for('trust_center') }}">Trust Center</a></div>
+    </div>
+
+    <div class="chart-card" style="margin-top:24px;">
+        <h2>Decision-support workflow</h2>
+        <p>Citizen Voice → AI Understanding → Explainable Analysis → Demand Intelligence → Hotspots → Infrastructure Insights → Government Review → Department Action → Resolution → Citizen Feedback → Outcome Intelligence</p>
+        <p class="review-note">AI-generated recommendation • Human review required.</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(async()=>{
+  const set=(id,value)=>{const el=document.getElementById(id);if(el)el.textContent=value;};
+  const fetchJson=async(url)=>{
+    const response=await fetch(url,{headers:{'Accept':'application/json'}});
+    if(!response.ok) throw new Error(`${url} returned HTTP ${response.status}`);
+    return response.json();
+  };
+  try{
+    const [s,sla,e,d]=await Promise.all([
+      fetchJson('/api/dashboard/stats'),
+      fetchJson('/api/sla/overview'),
+      fetchJson('/api/analytics/emerging-issues'),
+      fetchJson('/api/analytics/departments')
+    ]);
+    set('gTotal',s.total_requests ?? 0);
+    set('gActive',(s.pending_requests||0)+(s.in_progress_requests||0));
+    set('gHigh',s.high_critical_requests ?? 0);
+    set('gResolved',s.resolved_requests ?? 0);
+    set('gOverdue',s.overdue_requests ?? 0);
+    const slaCounts=sla.counts||{};
+    const resolvedForSla=(slaCounts.resolved||0)+(slaCounts.breached||0);
+    const compliant=slaCounts.resolved||0;
+    set('gSla',resolvedForSla ? `${Math.round(compliant/resolvedForSla*100)}%` : '—');
+    const emerging=document.getElementById('gEmerging');
+    if(emerging) emerging.innerHTML=(e.issues||[]).slice(0,6).map(x =>
+      `<p><strong>${escapeHtml(x.issue||'Issue')}</strong>: ${Number(x.current_count||0)} vs ${Number(x.previous_count||0)} (${Number(x.change_percent||0)}%)</p>`
+    ).join('') || '<p>No significant emerging pattern detected.</p>';
+    const departments=document.getElementById('gDepartments');
+    if(departments) departments.innerHTML=(d||[]).slice(0,6).map(x =>
+      `<p><strong>${escapeHtml(x.department||'Department')}</strong> — ${Number(x.resolved||0)}/${Number(x.total_assigned||0)} resolved; SLA ${x.sla_compliance===null||x.sla_compliance===undefined?'—':x.sla_compliance+'%'}</p>`
+    ).join('') || '<p>No officially assigned department data.</p>';
+  }catch(err){
+    console.error('Government dashboard data load failed:',err);
+    ['gTotal','gActive','gHigh','gResolved','gOverdue','gSla'].forEach(id=>set(id,'—'));
+    const e=document.getElementById('gEmerging'); if(e)e.innerHTML='<p class="form-hint">Live analytics could not be loaded. Please refresh or check the server logs.</p>';
+    const d=document.getElementById('gDepartments'); if(d)d.innerHTML='<p class="form-hint">Department metrics could not be loaded.</p>';
+  }
+  function escapeHtml(value){
+    return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+{% endblock %}

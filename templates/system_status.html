@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}System Status - CivicPulse AI{% endblock %}
+{% block content %}
+<div class="page-header"><h1>System Status</h1><p>Current application-level availability of implemented CivicPulse modules.</p></div>
+<div class="container"><div class="chart-card"><div class="dashboard-grid">
+{% for name, ok in checks.items() %}<div class="stat-card"><div class="stat-content"><div class="stat-value">{{ 'Operational' if ok else 'Unavailable' }}</div><div class="stat-label">{{ name }}</div></div></div>{% endfor %}
+</div><p class="form-hint">Operational means the corresponding implemented application component is available in this deployment; it does not guarantee external providers or internet services.</p></div></div>
+{% endblock %}

@@ -1,0 +1,397 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<!-- Hero Section -->
+<section class="hero">
+    <div class="hero-content">
+        <h1 class="hero-title">Turning Citizen Voices into Smarter Public Development</h1>
+        <p class="hero-subtitle">AI-powered infrastructure analysis that puts citizen needs at the center of development planning.</p>
+        <p class="review-note">AI-generated recommendation • Human review required.</p>
+        
+        <div class="hero-stats">
+            <div class="stat-card">
+                <div class="stat-number">{{ hero_stats.requests }}</div>
+                <div class="stat-label">Citizen Requests</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{{ hero_stats.districts }}</div>
+                <div class="stat-label">Districts Analyzed</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{{ hero_stats.high_demand }}</div>
+                <div class="stat-label">High-Demand Areas</div>
+            </div>
+        </div>
+        
+        <div class="hero-ctas">
+            {% if not current_user.is_authenticated %}
+                <a href="/auth/register" class="btn btn-primary">Register & Submit Request</a>
+                <a href="/auth/login" class="btn btn-secondary">Officer Login</a>
+            {% else %}
+                {% if current_user.role == 'Citizen' %}
+                    <a href="/citizen/request" class="btn btn-primary">Submit a Request</a>
+                    <a href="/citizen/analysis" class="btn btn-secondary">View My Requests</a>
+                {% elif current_user.role == 'Officer' %}
+                    <a href="/officer/dashboard" class="btn btn-primary">View Dashboard</a>
+                    <a href="/officer/demand-analysis" class="btn btn-secondary">Demand Analysis</a>
+                {% elif current_user.role == 'Admin' %}
+                    <a href="/admin/dashboard" class="btn btn-primary">Admin Panel</a>
+                {% endif %}
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="hero-visual">
+        <div class="india-map-placeholder">
+            <div class="map-element">India</div>
+            <div class="hotspot hotspot-1"></div>
+            <div class="hotspot hotspot-2"></div>
+            <div class="hotspot hotspot-3"></div>
+        </div>
+    </div>
+</section>
+
+<!-- Trust Indicators -->
+<section class="trust-strip">
+    <div class="container">
+        <h3>Our Approach</h3>
+        <div class="trust-items">
+            <div class="trust-item">
+                <span class="trust-icon">📊</span>
+                <span class="trust-label">Data-Driven</span>
+            </div>
+            <div class="trust-item">
+                <span class="trust-icon">🤖</span>
+                <span class="trust-label">AI-Powered</span>
+            </div>
+            <div class="trust-item">
+                <span class="trust-icon">👥</span>
+                <span class="trust-label">Human-Reviewed</span>
+            </div>
+            <div class="trust-item">
+                <span class="trust-icon">🔍</span>
+                <span class="trust-label">Explainable</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Report a Need Section -->
+<section class="section feature-highlight">
+    <div class="container">
+        <div class="section-header">
+            <h2>Report a Citizen Need</h2>
+            <p>Your voice matters. Report infrastructure gaps and citizen needs in your community.</p>
+        </div>
+        
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="feature-icon">1️⃣</div>
+                <h3>Express Your Need</h3>
+                <p>Describe the infrastructure gap or citizen need in your community in your own words or voice.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">2️⃣</div>
+                <h3>AI Analysis</h3>
+                <p>Our AI analyzes language, category, urgency, and infrastructure gaps to understand your request.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">3️⃣</div>
+                <h3>Human Review</h3>
+                <p>Government officers review and verify all AI recommendations before planning action.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">4️⃣</div>
+                <h3>Track Impact</h3>
+                <p>Monitor how citizen needs translate into development priorities and government action.</p>
+            </div>
+        </div>
+        
+        <div class="feature-cta">
+            {% if not current_user.is_authenticated %}
+                <a href="/auth/register" class="btn btn-primary">Start Reporting</a>
+            {% else %}
+                <a href="/citizen/request" class="btn btn-primary">Submit Request</a>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<!-- Workflow Section -->
+<section class="section workflow">
+    <div class="container">
+        <div class="section-header">
+            <h2>How It Works</h2>
+            <p>From citizen voice to development priority</p>
+        </div>
+        
+        <div class="workflow-pipeline">
+            <div class="workflow-step">
+                <div class="step-number">1</div>
+                <div class="step-label">Citizen Needs</div>
+            </div>
+            <div class="workflow-arrow">→</div>
+            <div class="workflow-step">
+                <div class="step-number">2</div>
+                <div class="step-label">Data Collection</div>
+            </div>
+            <div class="workflow-arrow">→</div>
+            <div class="workflow-step">
+                <div class="step-number">3</div>
+                <div class="step-label">AI Analysis</div>
+            </div>
+            <div class="workflow-arrow">→</div>
+            <div class="workflow-step">
+                <div class="step-number">4</div>
+                <div class="step-label">Demand Hotspots</div>
+            </div>
+            <div class="workflow-arrow">→</div>
+            <div class="workflow-step">
+                <div class="step-number">5</div>
+                <div class="step-label">Action Plan</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- AI Analysis Capabilities -->
+<section class="section ai-capabilities">
+    <div class="container">
+        <div class="section-header">
+            <h2>AI Analysis Capabilities</h2>
+            <p>What our AI analyzes in every citizen request</p>
+        </div>
+        
+        <div class="capabilities-grid">
+            <div class="capability-card">
+                <div class="capability-icon">🌐</div>
+                <h3>Language Detection</h3>
+                <p>Understands requests in English, Hindi, Tamil, Telugu, Kannada, and Malayalam.</p>
+            </div>
+            <div class="capability-card">
+                <div class="capability-icon">📂</div>
+                <h3>Category Classification</h3>
+                <p>Categorizes requests into Roads, Water, Healthcare, Education, and more.</p>
+            </div>
+            <div class="capability-card">
+                <div class="capability-icon">🚨</div>
+                <h3>Urgency Analysis</h3>
+                <p>Determines if a need is Low, Moderate, or High priority based on content.</p>
+            </div>
+            <div class="capability-card">
+                <div class="capability-icon">📍</div>
+                <h3>Geographic Mapping</h3>
+                <p>Identifies location hotspots with highest infrastructure demand and gaps.</p>
+            </div>
+            <div class="capability-card">
+                <div class="capability-icon">🔗</div>
+                <h3>Similar Requests</h3>
+                <p>Finds similar citizen requests to identify patterns and trends.</p>
+            </div>
+            <div class="capability-card">
+                <div class="capability-icon">📊</div>
+                <h3>Impact Estimation</h3>
+                <p>Estimates population affected and infrastructure gap scores for planning.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Demand Analysis Preview -->
+<section class="section demand-preview">
+    <div class="container">
+        <div class="section-header">
+            <h2>Demand Analysis Dashboard</h2>
+            <p>Real-time insights from citizen requests across India</p>
+        </div>
+        
+        <div class="dashboard-preview">
+            <div class="preview-stat">
+                <div class="stat-value">24,680</div>
+                <div class="stat-title">Total Requests</div>
+            </div>
+            <div class="preview-stat">
+                <div class="stat-value">18,420</div>
+                <div class="stat-title">Analyzed</div>
+            </div>
+            <div class="preview-stat">
+                <div class="stat-value">142</div>
+                <div class="stat-title">Districts</div>
+            </div>
+            <div class="preview-stat">
+                <div class="stat-value">38</div>
+                <div class="stat-title">Priority Areas</div>
+            </div>
+        </div>
+        
+        <div class="preview-cta">
+            {% if current_user.is_authenticated and current_user.role in ['Officer', 'Admin'] %}
+                <a href="/officer/demand-analysis" class="btn btn-secondary">View Full Dashboard</a>
+            {% else %}
+                <p class="info-text">Login as Government Officer to access detailed analytics</p>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<!-- Hotspot Identification -->
+<section class="section hotspot-preview">
+    <div class="container">
+        <div class="section-header">
+            <h2>Infrastructure Hotspot Identification</h2>
+            <p>Geographic analysis of infrastructure gaps and citizen demand</p>
+        </div>
+        
+        <div class="hotspot-summary">
+            <p><strong>Illustrative Demo Data:</strong> The following hotspots represent areas with highest citizen demand and infrastructure gaps:</p>
+            <div class="hotspot-list">
+                <div class="hotspot-item">
+                    <span class="hotspot-rank">1</span>
+                    <span class="hotspot-name">Salem, Tamil Nadu</span>
+                    <span class="hotspot-gap">Gap: 8.4/10</span>
+                </div>
+                <div class="hotspot-item">
+                    <span class="hotspot-rank">2</span>
+                    <span class="hotspot-name">Nashik, Maharashtra</span>
+                    <span class="hotspot-gap">Gap: 7.8/10</span>
+                </div>
+                <div class="hotspot-item">
+                    <span class="hotspot-rank">3</span>
+                    <span class="hotspot-name">Davangere, Karnataka</span>
+                    <span class="hotspot-gap">Gap: 7.5/10</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="preview-cta">
+            {% if current_user.is_authenticated and current_user.role in ['Officer', 'Admin'] %}
+                <a href="/officer/hotspots" class="btn btn-secondary">View Interactive Map</a>
+            {% else %}
+                <p class="info-text">Login as Government Officer to access interactive hotspot map</p>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<!-- Government Dashboard Preview -->
+<section class="section government-preview">
+    <div class="container">
+        <div class="section-header">
+            <h2>Government Priority Recommendations</h2>
+            <p>Data-driven insights for development planning</p>
+        </div>
+        
+        <div class="recommendations-grid">
+            <div class="recommendation-card">
+                <h3>Road Connectivity</h3>
+                <p>Salem, Tamil Nadu: High citizen demand for road infrastructure with infrastructure gap score of 8.4/10. Recommend prioritizing pothole repairs and lane marking based on 2,840+ citizen requests.</p>
+                <div class="recommendation-factors">
+                    <span class="factor-tag">High Demand</span>
+                    <span class="factor-tag">Large Gap</span>
+                </div>
+            </div>
+            <div class="recommendation-card">
+                <h3>Healthcare Access</h3>
+                <p>Multiple districts report inadequate healthcare facilities. Estimated 4.2M people impacted. Recommend satellite clinics and ambulance service enhancement.</p>
+                <div class="recommendation-factors">
+                    <span class="factor-tag">High Impact</span>
+                    <span class="factor-tag">Critical</span>
+                </div>
+            </div>
+            <div class="recommendation-card">
+                <h3>Digital Connectivity</h3>
+                <p>Rural areas report digital infrastructure gaps. Recommend fiber optic network expansion to underserved villages based on 1,240+ requests.</p>
+                <div class="recommendation-factors">
+                    <span class="factor-tag">Strategic</span>
+                    <span class="factor-tag">Future Priority</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="preview-cta">
+            {% if current_user.is_authenticated and current_user.role == 'Officer' %}
+                <a href="/officer/government-dashboard" class="btn btn-secondary">Full Government Dashboard</a>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<!-- Responsible AI Section -->
+<section class="section responsible-ai">
+    <div class="container">
+        <div class="section-header">
+            <h2>Responsible AI & Transparency</h2>
+            <p>How we ensure AI recommendations serve citizen interests</p>
+        </div>
+        
+        <div class="responsibility-grid">
+            <div class="responsibility-card">
+                <h3>🤖 AI-Generated, Not AI-Decided</h3>
+                <p>Every AI recommendation is flagged for human review. AI does not make final decisions. Government officers and planners review, verify, and make final choices.</p>
+            </div>
+            <div class="responsibility-card">
+                <h3>🔍 Explainability</h3>
+                <p>For every recommendation, we show the reasoning: citizen demand metrics, infrastructure gap scores, population impact, and alignment with existing plans.</p>
+            </div>
+            <div class="responsibility-card">
+                <h3>👥 Human Oversight</h3>
+                <p>Every request undergoes manual review by trained government officers who verify AI analysis and make informed decisions.</p>
+            </div>
+            <div class="responsibility-card">
+                <h3>📊 Data Privacy</h3>
+                <p>Citizen identities are protected. Analysis is performed at the aggregate and geographic level, not individual. No personal data is exposed.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Accessibility & Multilingual Support -->
+<section class="section accessibility">
+    <div class="container">
+        <div class="section-header">
+            <h2>Inclusive & Accessible</h2>
+            <p>Built for all citizens, regardless of language or digital literacy</p>
+        </div>
+        
+        <div class="accessibility-features">
+            <div class="access-feature">
+                <h3>🌐 Multilingual Support</h3>
+                <p>Requests accepted in English, Hindi, Tamil, Telugu, Kannada, and Malayalam. AI automatically detects and processes language.</p>
+            </div>
+            <div class="access-feature">
+                <h3>🎙️ Voice Input Option</h3>
+                <p>Submit requests via voice when text input is inconvenient (demo feature).</p>
+            </div>
+            <div class="access-feature">
+                <h3>♿ Accessible Design</h3>
+                <p>WCAG-compliant design with high contrast, keyboard navigation, and screen reader support.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Final CTA -->
+<section class="section final-cta">
+    <div class="container">
+        <div class="cta-content">
+            <h2>Start Making a Difference</h2>
+            <p>Whether you're a citizen with a need or a government officer planning development, CivicPulse AI puts you in control.</p>
+            
+            <div class="cta-buttons">
+                {% if not current_user.is_authenticated %}
+                    <a href="/auth/register" class="btn btn-primary btn-large">Register as Citizen</a>
+                    <a href="/auth/login" class="btn btn-secondary btn-large">Officer Login</a>
+                {% else %}
+                    {% if current_user.role == 'Citizen' %}
+                        <a href="/citizen/request" class="btn btn-primary btn-large">Submit Your Request</a>
+                    {% elif current_user.role == 'Officer' %}
+                        <a href="/officer/dashboard" class="btn btn-primary btn-large">View Dashboard</a>
+                    {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+
+{% endblock %}

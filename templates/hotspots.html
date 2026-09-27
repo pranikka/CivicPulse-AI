@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+
+{% block title %}Hotspot Map - CivicPulse AI{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+<style>
+    #civicIssueMap { min-height: 520px; width: 100%; border-radius: 10px; overflow: hidden; }
+    .map-summary { display:flex; gap:12px; flex-wrap:wrap; margin: 12px 0; }
+    .map-summary .metric { padding:10px 14px; border:1px solid #e5e7eb; border-radius:8px; }
+    .hotspot-severity-high { color:#b91c1c; font-weight:700; }
+    .hotspot-severity-moderate { color:#b45309; font-weight:700; }
+    .hotspot-severity-low { color:#15803d; font-weight:700; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <h1>Infrastructure Hotspot Map</h1>
+    <p>Geographic analysis of citizen complaints and issue hotspots</p>
+</div>
+
+<div class="container">
+    <div class="hotspot-controls">
+        <div class="filter-group" style="display:flex;gap:10px;flex-wrap:wrap;">
+            <select id="stateSelect" class="filter-input">
+                <option value="">All States</option>
+            </select>
+            <select id="categorySelect" class="filter-input">
+                <option value="">All Categories</option>
+            </select>
+            <select id="prioritySelect" class="filter-input">
+                <option value="">All Priorities</option>
+                <option value="Critical">Critical</option>
+                <option value="High">High</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
+            </select>
+            <select id="statusSelect" class="filter-input">
+                <option value="">All Statuses</option>
+                <option value="Submitted">Submitted</option>
+                <option value="Analyzed">Analyzed</option>
+                <option value="Pending">Pending</option>
+                <option value="In-Progress">In-Progress</option>
+                <option value="Resolved">Resolved</option>
+            </select>
+            <input type="date" id="mapStartDate" class="filter-input">
+            <input type="date" id="mapEndDate" class="filter-input">
+            <button type="button" class="btn btn-sm btn-secondary" id="applyMapFilters">Apply Filters</button>
+            <button type="button" class="btn btn-sm btn-outline" id="clearMapFilters">Clear</button>
+        </div>
+    </div>
+
+    <div class="chart-card">
+        <div class="map-summary">
+            <div class="metric"><strong id="mapComplaintCount">0</strong> mapped complaints</div>
+            <div class="metric"><strong id="mapHotspotCount">0</strong> detected hotspots</div>
+            <div class="metric">Only location and issue metadata are shown; contact information is never exposed.</div>
+            <div class="metric" id="mapUnmappedNote" aria-live="polite"></div>
+        </div>
+        <div id="civicIssueMap"></div>
+    </div>
+
+    <div class="chart-card">
+        <h2>Civic Hotspot Detection</h2>
+        <p>Hotspots are calculated from actual complaint counts by local area/ward. No synthetic demand or population data is used.</p>
+        <div class="hotspots-table" id="civicHotspotsTable">
+            <p>Loading hotspot data...</p>
+        </div>
+    </div>
+
+    <div class="legend">
+        <h3>Map Legend</h3>
+        <div class="legend-items">
+            <div class="legend-item"><span>🔴 Critical / High priority</span></div>
+            <div class="legend-item"><span>🟠 Medium priority</span></div>
+            <div class="legend-item"><span>🟢 Low or unclassified priority</span></div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script>
+(() => {
+    const map = L.map('civicIssueMap').setView([20.5937, 78.9629], 5);
+    const tileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+    tileLayer.on('tileerror', () => {
+        const mapBox = document.getElementById('civicIssueMap');
+        if (mapBox && !mapBox.querySelector('.map-tile-warning')) {
+            const warning = document.createElement('div');
+            warning.className = 'map-tile-warning';
+            warning.style.cssText = 'position:absolute;z-index:1000;top:10px;right:10px;background:#fff;padding:8px 10px;border-radius:6px;box-shadow:0 1px 5px rgba(0,0,0,.25);font-size:12px;';
+            warning.textContent = 'Map tiles could not be loaded. Check your internet connection.';
+            mapBox.appendChild(warning);
+        }
+    });
+
+    const cluster = L.markerClusterGroup();
+    map.addLayer(cluster);
+    let allComplaints = [];
+
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, ch => ({
+            '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+        }[ch]));
+    }
+
+    function markerClass(priority) {
+        if (priority === 'Critical' || priority === 'High') return '🔴';
+        if (priority === 'Medium') return '🟠';
+        return '🟢';
+    }
+
+    function queryString() {
+        const params = new URLSearchParams();
+        const fields = {
+            state: document.getElementById('stateSelect').value,
+            category: document.getElementById('categorySelect').value,
+            priority: document.getElementById('prioritySelect').value,
+            status: document.getElementById('statusSelect').value,
+            start_date: document.getElementById('mapStartDate').value,
+            end_date: document.getElementById('mapEndDate').value
+        };
+        Object.entries(fields).forEach(([key, value]) => { if (value) params.set(key, value); });
+        return params.toString();
+    }
+
+    async function fillFilters(data) {
+        let geo={};
+        try{geo=await fetch('/api/geo/options').then(r=>r.json());}catch(e){}
+        const states = Object.keys(geo);
+        const categories = [...new Set(data.map(x => x.category).filter(Boolean).concat(['Roads & Transport','Healthcare','Education','Water & Sanitation','Digital Connectivity','Electricity','Public Facilities','Other']))].sort();
+        const state = document.getElementById('stateSelect');
+        const category = document.getElementById('categorySelect');
+        const oldState = state.value; const oldCategory = category.value;
+        state.innerHTML = '<option value="">All States</option>' + states.map(x => `<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join('');
+        category.innerHTML = '<option value="">All Categories</option>' + categories.map(x => `<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join('');
+        state.value = states.includes(oldState) ? oldState : '';
+        category.value = categories.includes(oldCategory) ? oldCategory : '';
+    }
+
+    function renderMarkers(data) {
+        cluster.clearLayers();
+        data.forEach(item => {
+            const marker = L.marker([item.latitude, item.longitude]);
+            const summary = `
+                <strong>${escapeHtml(item.title || 'Citizen Complaint')}</strong><br>
+                ${markerClass(item.priority)} Priority: ${escapeHtml(item.priority || 'Unclassified')}<br>
+                Category: ${escapeHtml(item.category || 'Other')}<br>
+                Status: ${escapeHtml(item.status)}<br>
+                Location: ${escapeHtml(item.local_area || '')}, ${escapeHtml(item.district || '')}<br>
+                Precision: ${escapeHtml(item.location_precision || 'GPS')}<br>
+                ID: ${escapeHtml(item.request_id)}
+            `;
+            marker.bindPopup(summary);
+            cluster.addLayer(marker);
+        });
+        document.getElementById('mapComplaintCount').textContent = data.length;
+        const unmappedNote = document.getElementById('mapUnmappedNote');
+        if (unmappedNote) {
+            unmappedNote.textContent = data.some(x => x.location_precision === 'District centre')
+                ? 'Some legacy requests are shown at district-centre precision because they do not contain GPS coordinates.'
+                : '';
+        }
+        if (data.length) {
+            const bounds = L.latLngBounds(data.map(x => [x.latitude, x.longitude]));
+            map.fitBounds(bounds.pad(0.15));
+        }
+    }
+
+    async function loadMap() {
+        const data = await window.CivicPulse.safeFetch('/api/complaints/map?' + queryString());
+        if (!data) return;
+        allComplaints = data;
+        await fillFilters(data);
+        renderMarkers(data);
+        loadHotspots();
+    }
+
+    async function loadHotspots() {
+        const data = await window.CivicPulse.safeFetch('/api/civic-hotspots?' + queryString());
+        if (!data) return;
+
+        document.getElementById('mapHotspotCount').textContent = data.length;
+        const container = document.getElementById('civicHotspotsTable');
+        if (!data.length) {
+            container.innerHTML = '<div class="empty-state"><p>No hotspot data is available yet.</p></div>';
+            return;
+        }
+
+        container.innerHTML = `
+            <table>
+                <thead><tr>
+                    <th>Rank</th><th>Area/Ward</th><th>District</th><th>State</th>
+                    <th>Requests</th><th>High/Critical</th><th>Main Issue</th><th>Category Distribution</th><th>Trend</th><th>Projects</th><th>Affected Population</th><th>Severity</th>
+                </tr></thead>
+                <tbody>
+                    ${data.map((h, i) => `
+                        <tr>
+                            <td><strong>#${i + 1}</strong></td>
+                            <td>${h.area}</td>
+                            <td>${h.district}</td>
+                            <td>${h.state}</td>
+                            <td>${h.count}</td>
+                            <td>${(h.priority_distribution?.High || 0) + (h.priority_distribution?.Critical || 0)}</td>
+                            <td>${escapeHtml(h.main_issue)}</td>
+                            <td>${escapeHtml(Object.entries(h.category_distribution || {}).map(([k,v]) => k+': '+v).join(', '))}</td>
+                            <td>${escapeHtml(h.trend)}${h.emerging_issue ? ' · Emerging' : ''}</td>
+                            <td>${h.existing_projects ?? 0}</td>
+                            <td>${h.affected_population ?? 0}</td>
+                            <td class="hotspot-severity-${h.severity.toLowerCase()}">${h.severity}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>`;
+    }
+
+    document.getElementById('applyMapFilters').addEventListener('click', loadMap);
+    document.getElementById('clearMapFilters').addEventListener('click', () => {
+        ['stateSelect','categorySelect','prioritySelect','statusSelect','mapStartDate','mapEndDate'].forEach(id => {
+            document.getElementById(id).value = '';
+        });
+        loadMap();
+    });
+
+    loadMap();
+})();
+</script>
+{% endblock %}

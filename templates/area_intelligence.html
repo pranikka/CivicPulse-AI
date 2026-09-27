@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Area Intelligence - CivicPulse AI{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Area Intelligence</h1>
+  <p>Evidence-based civic demand, service gaps and human-review status for a selected locality.</p>
+</div>
+<div class="container">
+  <div class="form-card">
+    <form method="GET" class="filter-form">
+      <div class="filter-row">
+        <select name="area" class="filter-input" required>
+          <option value="">Select an area / ward</option>
+          {% for area in areas %}<option value="{{ area }}" {% if selected == area %}selected{% endif %}>{{ area }}</option>{% endfor %}
+        </select>
+        <button class="btn btn-primary" type="submit">View Area Intelligence</button>
+      </div>
+    </form>
+  </div>
+  {% if data %}
+  <div class="dashboard-stats" style="margin-top:24px;">
+    <div class="stat-card"><div class="stat-content"><div class="stat-value">{{ data.total_requests }}</div><div class="stat-label">Citizen Requests</div></div></div>
+    <div class="stat-card"><div class="stat-content"><div class="stat-value">{{ data.high_priority_requests }}</div><div class="stat-label">High/Critical Priority</div></div></div>
+    <div class="stat-card"><div class="stat-content"><div class="stat-value">{{ data.unresolved_requests }}</div><div class="stat-label">Unresolved</div></div></div>
+    <div class="stat-card"><div class="stat-content"><div class="stat-value">{{ data.resolved_requests }}</div><div class="stat-label">Resolved</div></div></div>
+  </div>
+
+  <div class="dashboard-grid" style="margin-top:24px;">
+    <div class="chart-card">
+      <h2>Top Categories</h2>
+      {% for name,count in data.top_categories %}
+      <div class="category-item"><span>{{ name }}</span><strong>{{ count }}</strong></div>
+      {% else %}<p>No request data is available for this area.</p>{% endfor %}
+    </div>
+    <div class="chart-card">
+      <h2>Hotspots within area</h2>
+      {% for name,count in data.hotspots %}
+      <div class="category-item"><span>{{ name }}</span><strong>{{ count }}</strong></div>
+      {% else %}<p>No locality hotspot data is available.</p>{% endfor %}
+    </div>
+  </div>
+
+  <div class="chart-card" style="margin-top:24px;">
+    <h2>Infrastructure / Service Gap</h2>
+    <p>Potential development attention area based on recorded demand and available infrastructure/project data.</p>
+    <strong>{{ data.infrastructure_gap if data.infrastructure_gap is not none else 'Not available' }}{% if data.infrastructure_gap is not none %}/10{% endif %}</strong>
+    <p class="form-hint">This is an analytical indicator, not an automatic government project decision.</p>
+  </div>
+
+  <div class="chart-card" style="margin-top:24px;">
+    <h2>Existing Projects</h2>
+    {% for project in data.existing_projects %}
+      <div class="category-item"><span>{{ project.title }} · {{ project.category or 'General' }}</span><strong>{{ project.status }}</strong></div>
+    {% else %}<p>No existing projects are recorded for this area in the current database.</p>{% endfor %}
+  </div>
+
+  <div class="chart-card" style="margin-top:24px;">
+    <h2>AI-generated insights</h2>
+    <p>AI-generated recommendation • Human review required.</p>
+    <ul>{% for insight in data.insights %}<li>{{ insight }}</li>{% else %}<li>Insufficient evidence for an area-level insight.</li>{% endfor %}</ul>
+  </div>
+
+  <div class="chart-card" style="margin-top:24px;">
+    <h2>Human-review status</h2>
+    {% for status,count in data.review_status.items() %}
+      <div class="category-item"><span>{{ status }}</span><strong>{{ count }}</strong></div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

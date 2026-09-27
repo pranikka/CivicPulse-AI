@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Responsible AI & Trust Center - CivicPulse AI{% endblock %}
+{% block content %}
+<div class="page-header"><h1>Responsible AI & Trust Center</h1><p>How CivicPulse AI supports transparent, human-controlled public-sector decision support.</p></div>
+<div class="container">
+<div class="chart-card"><h2>AI-generated recommendation • Human review required.</h2><p>CivicPulse AI analyzes citizen requests and stored civic-demand data. It does not automatically approve, reject, prioritize or authorize government projects.</p></div>
+<div class="dashboard-grid">
+{% for title, body in [
+('Human oversight','Officers review AI-assisted analysis before a final government action is accepted.'),
+('Explainability','Analysis pages show the result, confidence, supporting factors, data signals and limitations.'),
+('Uncertainty','Confidence is derived from the configured analysis method; low-confidence outputs are explicitly flagged.'),
+('Privacy & data minimization','Public maps and aggregate analytics avoid exposing citizen contact details and unnecessary private information.'),
+('Role-based access','Citizen, Officer and Admin workflows are separated and protected by server-side authorization.'),
+('Auditability','Workflow, review and administrative actions are recorded in the audit trail where implemented.'),
+('Recommendation methodology','The default local analyzer uses deterministic language/category/context signals and stored request patterns.'),
+('Responsible use','Insights are development-attention signals, not automatic government decisions.')
+] %}
+<div class="chart-card"><h3>{{ title }}</h3><p>{{ body }}</p></div>
+{% endfor %}
+</div>
+</div>
+{% endblock %}

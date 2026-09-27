@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Data Quality - CivicPulse AI{% endblock %}
+{% block content %}
+<div class="page-header"><h1>Data Quality & Coverage</h1><p>Administrative monitoring of data completeness. No records are changed automatically.</p></div>
+<div class="container"><div class="dashboard-stats">
+<div class="stat-card"><div class="stat-content"><div class="stat-value">{{ quality.records }}</div><div class="stat-label">Records</div></div></div>
+<div class="stat-card"><div class="stat-content"><div class="stat-value">{{ quality.missing_location_pct }}%</div><div class="stat-label">Missing location</div></div></div>
+<div class="stat-card"><div class="stat-content"><div class="stat-value">{{ quality.missing_category_pct }}%</div><div class="stat-label">Missing category</div></div></div>
+<div class="stat-card"><div class="stat-content"><div class="stat-value">{{ quality.duplicate_indicators }}</div><div class="stat-label">Duplicate indicators</div></div></div>
+</div>
+<div class="chart-card"><h2>Actionable warnings</h2>
+<ul>
+<li>Incomplete records: {{ quality.incomplete }}</li>
+<li>Invalid upload filename indicators: {{ quality.invalid_uploads }}</li>
+<li>Date coverage: {{ quality.date_min or '—' }} to {{ quality.date_max or '—' }}</li>
+</ul>
+<p class="review-note">Warnings are indicators only. Administrative action is required before changing or deleting data.</p></div>
+</div>{% endblock %}

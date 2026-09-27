@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Request Submitted - CivicPulse AI{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <h1>✅ Request Submitted Successfully!</h1>
+</div>
+
+<div class="container">
+    <div class="success-card">
+        <div class="success-icon">🎉</div>
+        
+        <h2>Your Request has been Received</h2>
+        
+        <div class="tracking-id-box">
+            <p>Your Tracking ID:</p>
+            <div class="tracking-id">{{ request_id }}</div>
+            <p style="font-size: 0.9em; color: #666;">Use this ID to track your request anytime</p>
+        </div>
+        
+        <div class="status-timeline">
+            <div class="timeline-step active">
+                <div class="step-circle">✓</div>
+                <div class="step-label">Request Submitted</div>
+            </div>
+            <div class="timeline-step">
+                <div class="step-circle">→</div>
+                <div class="step-label">AI Analysis</div>
+            </div>
+            <div class="timeline-step">
+                <div class="step-circle">→</div>
+                <div class="step-label">Human Review</div>
+            </div>
+            <div class="timeline-step">
+                <div class="step-circle">→</div>
+                <div class="step-label">Action Plan</div>
+            </div>
+        </div>
+        
+        {% if duplicate_count %}
+        <div class="info-box" style="margin-top:24px;">
+            <h3>Similar complaint pattern found.</h3>
+            <p>{{ duplicate_count }} recent complaint{{ '' if duplicate_count == 1 else 's' }} show similar characteristics. This is only a review hint; your complaint was not rejected. Details of other citizens' complaints are not disclosed.</p>
+        </div>
+        {% endif %}
+
+        <div class="success-details">
+            <h3>What Happens Now?</h3>
+            <ul>
+                <li><strong>Immediate (Now):</strong> Our AI analyzes your request for language, category, urgency, and infrastructure gap.</li>
+                <li><strong>Within 24 hours:</strong> A government officer reviews the AI analysis and confirms the assessment.</li>
+                <li><strong>This week:</strong> Your insight may contribute to demand hotspot identification for your district.</li>
+                <li><strong>Next month:</strong> Insights from citizen requests like yours inform development priority discussions.</li>
+            </ul>
+        </div>
+        
+        <div class="success-ctas">
+            <a href="/citizen/analysis" class="btn btn-primary">View My Requests</a>
+            <a href="/citizen/request" class="btn btn-secondary">Submit Another Request</a>
+            <a href="/" class="btn btn-outline">Back to Home</a>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

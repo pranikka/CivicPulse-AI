@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - CivicPulse AI{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Administration Dashboard</h1>
+    <p>Live platform-wide operational overview and governance controls</p>
+</div>
+
+<div class="container">
+    <div class="info-box" style="margin-bottom:20px;">
+        <strong>Current scope:</strong> {{ stats.total_requests }} requests match the selected filters.
+        {% if filters.state or filters.district or filters.category or filters.priority or filters.status %}
+        <span>Clear filters to return to the complete platform view.</span>
+        {% else %}
+        <span>All current Citizen Requests are included for Admin.</span>
+        {% endif %}
+    </div>
+
+    <form method="GET" action="{{ url_for('admin_dashboard') }}" class="report-filter-form" id="adminDashboardFilters">
+        <div class="form-group"><label>State</label>
+            <select name="state" id="adminStateFilter"><option value="">All States</option>
+            {% for state, districts in geo_options.items() %}<option value="{{ state }}" {% if filters.state == state %}selected{% endif %}>{{ state }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="form-group"><label>District</label>
+            <select name="district" id="adminDistrictFilter"><option value="">All Districts</option></select>
+        </div>
+        <div class="form-group"><label>Category</label>
+            <select name="category"><option value="">All Categories</option>
+            {% for category in categories %}<option value="{{ category }}" {% if filters.category == category %}selected{% endif %}>{{ category }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="form-group"><label>Priority</label>
+            <select name="priority"><option value="">All Priorities</option>{% for p in ['Low','Medium','High','Critical'] %}<option value="{{ p }}" {% if filters.priority == p %}selected{% endif %}>{{ p }}</option>{% endfor %}</select>
+        </div>
+        <div class="form-group"><label>Status</label>
+            <select name="status"><option value="">All Statuses</option>{% for status in statuses %}<option value="{{ status }}" {% if filters.status == status %}selected{% endif %}>{{ status }}</option>{% endfor %}</select>
+        </div>
+        <div class="report-actions">
+            <button class="btn btn-primary" type="submit">Apply Filters</button>
+            <a class="btn btn-secondary" href="{{ url_for('admin_dashboard') }}">Clear</a>
+        </div>
+    </form>
+
+    <div class="admin-stats">
+        <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-content"><div class="stat-value">{{ stats.total_requests }}</div><div class="stat-label">Requests in Scope</div></div></div>
+        <div class="stat-card"><div class="stat-icon">⏳</div><div class="stat-content"><div class="stat-value">{{ stats.pending_count }}</div><div class="stat-label">Pending</div></div></div>
+        <div class="stat-card"><div class="stat-icon">🔄</div><div class="stat-content"><div class="stat-value">{{ stats.in_progress_count }}</div><div class="stat-label">In Progress</div></div></div>
+        <div class="stat-card"><div class="stat-icon">🚨</div><div class="stat-content"><div class="stat-value">{{ stats.critical_count }}</div><div class="stat-label">Critical</div></div></div>
+        <div class="stat-card"><div class="stat-icon">⚠️</div><div class="stat-content"><div class="stat-value">{{ stats.high_critical_count }}</div><div class="stat-label">High / Critical</div></div></div>
+        <div class="stat-card"><div class="stat-icon">❗</div><div class="stat-content"><div class="stat-value">{{ stats.overdue_count }}</div><div class="stat-label">Overdue</div></div></div>
+        <div class="stat-card"><div class="stat-icon">📅</div><div class="stat-content"><div class="stat-value">{{ stats.due_today_count }}</div><div class="stat-label">Due Today</div></div></div>
+        <div class="stat-card"><div class="stat-icon">✅</div><div class="stat-content"><div class="stat-value">{{ stats.resolved_count }}</div><div class="stat-label">Resolved</div></div></div>
+        <div class="stat-card"><div class="stat-icon">📥</div><div class="stat-content"><div class="stat-value">{{ stats.unassigned_count }}</div><div class="stat-label">Truly Unassigned</div></div></div>
+        <div class="stat-card"><div class="stat-icon">🤖</div><div class="stat-content"><div class="stat-value">{{ stats.ai_pending_count }}</div><div class="stat-label">AI Recommendation Pending</div></div></div>
+        <div class="stat-card"><div class="stat-icon">⏱️</div><div class="stat-content"><div class="stat-value">{{ stats.sla_performance ~ '%' if stats.sla_performance is not none else '—' }}</div><div class="stat-label">Resolved SLA Compliance</div></div></div>
+        <div class="stat-card"><div class="stat-icon">⭐</div><div class="stat-content"><div class="stat-value">{{ stats.avg_rating ~ '/5' if stats.avg_rating is not none else '—' }}</div><div class="stat-label">Average Feedback</div></div></div>
+    </div>
+
+    <div class="dashboard-grid" style="margin-top:24px;">
+        <div class="chart-card"><h2>Requests by Category</h2><p>Actual request records in the selected Admin scope.</p><div style="height:310px;"><canvas id="adminCategoryChart"></canvas></div><div id="adminCategoryEmpty" class="info-box" style="display:none;">No category data available for the selected filters.</div></div>
+        <div class="chart-card"><h2>Requests by Urgency</h2><p>Uses stored urgency, with priority fallback for older records.</p><div style="height:310px;"><canvas id="adminUrgencyChart"></canvas></div><div id="adminUrgencyEmpty" class="info-box" style="display:none;">No urgency data available for the selected filters.</div></div>
+    </div>
+
+    <div class="dashboard-grid" style="margin-top:24px;">
+        <div class="chart-card"><h2>Requests by State</h2><p>Geographic distribution of the current request set.</p><div style="height:330px;"><canvas id="adminStateChart"></canvas></div></div>
+        <div class="chart-card"><h2>Platform Operations</h2><div class="overview-metrics">
+            <div class="overview-item"><h4>Citizens</h4><p>{{ stats.total_citizens }}</p></div>
+            <div class="overview-item"><h4>Officers</h4><p>{{ stats.total_officers }}</p></div>
+            <div class="overview-item"><h4>Departments</h4><p>{{ stats.active_departments }} active / {{ stats.total_departments }} total</p></div>
+            <div class="overview-item"><h4>Districts</h4><p>{{ stats.districts_count }}</p></div>
+            <div class="overview-item"><h4>Average Resolution</h4><p>{{ stats.average_resolution_hours ~ ' h' if stats.average_resolution_hours is not none else '—' }}</p></div>
+            <div class="overview-item"><h4>Feedback Responses</h4><p>{{ stats.feedback_count }}</p></div>
+        </div></div>
+    </div>
+
+    <div class="chart-card" style="margin-top:24px;">
+        <h2>Department Performance Analytics</h2>
+        <p>Operational metrics from the same live request dataset. No arbitrary ranking or score is applied.</p>
+        <div id="departmentPerformanceTable"><p>Loading department metrics...</p></div>
+    </div>
+
+    <div class="chart-card" style="margin-top:24px;">
+        <h2>Recent Audit Activity</h2>
+        {% if recent_activity %}<div style="overflow:auto;"><table><thead><tr><th>Time</th><th>Action</th><th>Entity</th><th>Actor</th></tr></thead><tbody>
+        {% for item in recent_activity %}<tr><td>{{ item.timestamp.strftime('%Y-%m-%d %H:%M') if item.timestamp else '—' }}</td><td>{{ item.action }}</td><td>{{ item.entity }}{% if item.entity_id %} · {{ item.entity_id }}{% endif %}</td><td>{{ item.user.username if item.user else 'System' }}</td></tr>{% endfor %}
+        </tbody></table></div>{% else %}<p>No audit activity is recorded yet.</p>{% endif %}
+    </div>
+
+    <div class="admin-modules"><h2>Platform Management Modules</h2><div class="module-grid">
+        <div class="module-card"><div class="module-icon">🏛️</div><h3>Department Management</h3><p>Create, edit, activate/deactivate departments and assign officers.</p><a class="btn btn-sm btn-secondary" href="{{ url_for('admin_departments') }}">Open Departments</a></div>
+        <div class="module-card"><div class="module-icon">📋</div><h3>Complaint Management</h3><p>Search, filter and inspect requests across the complete government workflow.</p><a class="btn btn-sm btn-secondary" href="{{ url_for('complaint_management') }}">Open Complaints</a></div>
+        <div class="module-card"><div class="module-icon">🔎</div><h3>Audit Activity</h3><p>Review department, assignment, priority, status and configuration changes.</p><a class="btn btn-sm btn-secondary" href="{{ url_for('admin_audit_log') }}">Open Audit Log</a></div>
+        <div class="module-card"><div class="module-icon">🧪</div><h3>Data Quality</h3><p>Inspect missing analysis, assignment and data-quality conditions.</p><a class="btn btn-sm btn-secondary" href="{{ url_for('admin_data_quality') }}">Open Data Quality</a></div>
+        <div class="module-card"><div class="module-icon">⏱️</div><h3>SLA Configuration</h3><p>Configure resolution targets while preserving existing complaint due dates.</p><a class="btn btn-sm btn-secondary" href="{{ url_for('admin_sla_settings') }}">Open SLA Settings</a></div>
+        <div class="module-card"><div class="module-icon">🛡️</div><h3>Data Governance</h3><p>Review responsible-AI, privacy and governance controls.</p><a class="btn btn-sm btn-secondary" href="{{ url_for('data_governance') }}">Open Governance</a></div>
+    </div></div>
+
+    <div class="admin-section"><h2>Analytics & Reports</h2><p>Generate reports using the same filter dimensions used above.</p>
+        <form method="GET" action="{{ url_for('admin_report_pdf') }}" class="report-filter-form" id="adminReportFilters">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            <div class="form-group"><label>Start date</label><input type="date" name="start_date"></div><div class="form-group"><label>End date</label><input type="date" name="end_date"></div><div class="form-group"><label>Category</label><input type="text" name="category" placeholder="Optional"></div><div class="form-group"><label>Department</label><input type="text" name="department" placeholder="Optional"></div><div class="form-group"><label>Status</label><select name="status"><option value="">All</option>{% for status in statuses %}<option>{{ status }}</option>{% endfor %}</select></div><div class="form-group"><label>Priority</label><select name="priority"><option value="">All</option>{% for p in ['Low','Medium','High','Critical'] %}<option>{{ p }}</option>{% endfor %}</select></div><div class="form-group"><label>Location</label><input type="text" name="location" placeholder="State, district or area"></div>
+            <div class="report-actions"><button class="btn btn-primary" type="submit">Download PDF</button><button class="btn btn-secondary" type="button" onclick="submitAdminExport('csv')">Export CSV</button><button class="btn btn-secondary" type="button" onclick="submitAdminExport('xlsx')">Export Excel</button></div>
+        </form><p class="form-hint">Exports contain complaint/report fields only. Passwords, tokens and authentication secrets are never exported.</p>
+    </div>
+
+    <div class="admin-section"><h2>Department Management</h2><p>Manage active departments, officer assignments, and department complaint views without deleting existing complaint data.</p><a class="btn btn-primary" href="{{ url_for('admin_departments') }}">Manage Departments</a><div style="margin-top:16px;display:grid;gap:10px;">
+        {% for department in departments %}<div class="info-box" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;"><span><strong>{{ department.name }}</strong> — {{ 'Active' if department.is_active else 'Inactive' }}</span><a class="btn btn-sm btn-secondary" href="{{ url_for('department_details', department_id=department.id) }}">View Department</a></div>{% endfor %}
+    </div></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const adminCategoryData = {{ stats.category_distribution|tojson }};
+const adminUrgencyData = {{ stats.urgency_distribution|tojson }};
+const adminStateData = {{ stats.state_distribution|tojson }};
+const geoOptions = {{ geo_options|tojson }};
+const selectedDistrict = {{ filters.district|tojson }};
+
+function makeAdminChart(id, data, type, label) {
+    const entries = Object.entries(data);
+    const canvas = document.getElementById(id);
+    if (!canvas || !entries.length) return null;
+    return new Chart(canvas.getContext('2d'), {
+        type,
+        data: { labels: entries.map(x => x[0]), datasets: [{ label, data: entries.map(x => x[1]) }] },
+        options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:type==='doughnut' } }, scales:type==='doughnut'?{}:{ y:{ beginAtZero:true, ticks:{ precision:0 } } } }
+    });
+}
+const categoryChart = makeAdminChart('adminCategoryChart', adminCategoryData, 'bar', 'Requests');
+const urgencyChart = makeAdminChart('adminUrgencyChart', adminUrgencyData, 'doughnut', 'Requests');
+const stateChart = makeAdminChart('adminStateChart', adminStateData, 'bar', 'Requests');
+if (!categoryChart) document.getElementById('adminCategoryEmpty').style.display='block';
+if (!urgencyChart) document.getElementById('adminUrgencyEmpty').style.display='block';
+
+function populateDistricts() {
+    const state = document.getElementById('adminStateFilter').value;
+    const select = document.getElementById('adminDistrictFilter');
+    const districts = state ? (geoOptions[state] || []) : Object.values(geoOptions).flat().filter((v,i,a)=>a.indexOf(v)===i).sort();
+    select.innerHTML = '<option value="">All Districts</option>' + districts.map(d => `<option value="${String(d).replace(/"/g,'&quot;')}" ${d===selectedDistrict?'selected':''}>${d}</option>`).join('');
+}
+document.getElementById('adminStateFilter').addEventListener('change', () => { document.getElementById('adminDistrictFilter').value=''; populateDistricts(); });
+populateDistricts();
+
+async function loadDepartmentPerformance() {
+    const target = document.getElementById('departmentPerformanceTable');
+    try {
+        const response = await fetch('/api/analytics/departments');
+        if (!response.ok) throw new Error('analytics');
+        const data = await response.json();
+        if (!data.length) { target.innerHTML='<p>No assigned department complaint data is available yet.</p>'; return; }
+        const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        target.innerHTML = `<div style="overflow:auto;"><table><thead><tr><th>Department</th><th>Total Assigned</th><th>Pending</th><th>Resolved</th><th>Avg Resolution</th><th>Overdue</th><th>SLA Compliance</th><th>Citizen Satisfaction</th><th>Categories</th></tr></thead><tbody>${data.map(row=>`<tr><td>${escapeHtml(row.department)}</td><td>${row.total_assigned}</td><td>${row.pending}</td><td>${row.resolved}</td><td>${row.average_resolution_hours===null?'—':row.average_resolution_hours+' h'}</td><td>${row.overdue}</td><td>${row.sla_compliance===null?'—':row.sla_compliance+'%'}</td><td>${row.citizen_satisfaction===null?'—':row.citizen_satisfaction+'/5'}</td><td>${row.categories.map(c=>`${escapeHtml(c.category)}: ${c.count}`).join(', ')||'—'}</td></tr>`).join('')}</tbody></table></div>`;
+    } catch(e) { target.innerHTML='<p>Department analytics could not be loaded.</p>'; }
+}
+loadDepartmentPerformance();
+
+function submitAdminExport(format) {
+    const form=document.getElementById('adminReportFilters');
+    const params=new URLSearchParams(new FormData(form));
+    const base=format==='csv'?'{{ url_for("admin_export", fmt="csv") }}':'{{ url_for("admin_export", fmt="xlsx") }}';
+    window.location.href=base+'?'+params.toString();
+}
+</script>
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Outcome Intelligence - CivicPulse AI{% endblock %}
+{% block content %}
+<div class="page-header"><h1>Outcome Intelligence</h1><p>Closed-loop analytics from requests, resolutions and citizen feedback.</p></div>
+<div class="container">
+<div class="chart-card"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><select id="period" class="filter-input"><option value="7d">7 days</option><option value="30d">30 days</option><option value="90d">90 days</option><option value="365d" selected>1 year</option></select><button class="btn btn-primary" onclick="loadOutcomes()">Refresh</button></div></div>
+<div class="dashboard-stats" id="outcomeCards"></div>
+<div class="dashboard-grid">
+<div class="chart-card"><h2>Category-level Civic Demand</h2><div id="categoryTable">Loading...</div></div>
+<div class="chart-card"><h2>Citizen Demand vs Existing Projects</h2><div id="projectTable">Loading...</div></div>
+</div>
+<div class="chart-card"><h2>Methodology</h2><p>All values are calculated from stored request, project, SLA and feedback records. No arbitrary performance score is created.</p><p class="review-note">AI-generated recommendation • Human review required.</p></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadOutcomes(){
+ const period=document.getElementById('period').value;
+ const [o,c,p]=await Promise.all([
+ fetch(`/api/analytics/outcomes?period=${period}`).then(r=>r.json()),
+ fetch('/api/analytics/categories').then(r=>r.json()),
+ fetch('/api/analytics/project-comparison').then(r=>r.json())
+ ]);
+ const cards=[
+ ['Resolution rate',o.resolution_rate+'%'],['Feedback rate',o.feedback_rate+'%'],
+ ['Satisfaction',o.satisfaction===null?'—':o.satisfaction+'/5'],['Reopened',o.reopened_requests],
+ ['SLA compliance',o.sla_compliance===null?'—':o.sla_compliance+'%'],
+ ['Avg resolution',o.average_resolution_hours===null?'—':o.average_resolution_hours+' h']
+ ];
+ document.getElementById('outcomeCards').innerHTML=cards.map(x=>`<div class="stat-card"><div class="stat-content"><div class="stat-value">${x[1]}</div><div class="stat-label">${x[0]}</div></div></div>`).join('');
+ document.getElementById('categoryTable').innerHTML='<div class="data-table-wrap"><table class="data-table"><tr><th>Category</th><th>Volume</th><th>High/Critical</th><th>Resolved</th><th>Resolution</th></tr>'+c.map(x=>`<tr><td>${x.category}</td><td>${x.volume}</td><td>${x.high_priority}</td><td>${x.resolved}</td><td>${x.resolution_rate}%</td></tr>`).join('')+'</table></div>';
+ document.getElementById('projectTable').innerHTML='<div class="data-table-wrap"><table class="data-table"><tr><th>Category</th><th>Demand</th><th>30d</th><th>Projects</th><th>Potential gap</th></tr>'+p.map(x=>`<tr><td>${x.category}</td><td>${x.citizen_demand}</td><td>${x.last_30_days}</td><td>${x.existing_projects}</td><td>${x.potential_gap?'Potential development attention area':'—'}</td></tr>`).join('')+'</table></div>';
+}
+loadOutcomes();
+</script>
+{% endblock %}

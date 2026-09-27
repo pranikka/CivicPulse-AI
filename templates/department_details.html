@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}{{ department.name }} - CivicPulse AI{% endblock %}
+{% block content %}
+<div class="page-header"><h1>{{ department.name }}</h1><p>{{ 'Active' if department.is_active else 'Inactive' }} department</p></div>
+<div class="container">
+  <div class="chart-card"><h2>Assigned Officers</h2>{% if officers %}<ul>{% for officer in officers %}<li>{{ officer.username }} — {{ officer.email }}</li>{% endfor %}</ul>{% else %}<p>No officers assigned.</p>{% endif %}</div>
+  <div class="chart-card" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
+      <h2>Department Complaints ({{ complaint_pagination.total }})</h2>
+      <a class="btn btn-sm btn-secondary" href="{{ url_for('complaint_management') }}?department={{ department.name|urlencode }}">Advanced Search</a>
+    </div>
+    {% if complaints %}
+      <div style="overflow:auto;"><table><thead><tr><th>ID</th><th>Title</th><th>Status</th><th>Priority</th><th>Created</th></tr></thead><tbody>
+      {% for c in complaints %}
+        <tr><td><a href="{{ url_for('complaint_details', request_id=c.request_id) }}">{{ c.request_id }}</a></td><td>{{ c.title or c.category }}</td><td>{{ c.status }}</td><td>{{ c.analysis.priority_override if c.analysis and c.analysis.priority_override else (c.analysis.priority if c.analysis else 'Low') }}</td><td>{{ c.created_at.strftime('%Y-%m-%d %H:%M') if c.created_at else '—' }}</td></tr>
+      {% endfor %}
+      </tbody></table></div>
+      {% if complaint_pagination.pages > 1 %}
+      <div class="pagination" style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:20px;">
+        {% if complaint_pagination.has_prev %}<a class="btn btn-sm btn-outline" href="?page={{ complaint_pagination.prev_num }}">Previous</a>{% endif %}
+        {% for p in complaint_pagination.iter_pages(left_edge=1,left_current=2,right_current=2,right_edge=1) %}
+          {% if p %}<a class="btn btn-sm {% if p == complaint_pagination.page %}btn-primary{% else %}btn-outline{% endif %}" href="?page={{ p }}">{{ p }}</a>{% else %}<span>…</span>{% endif %}
+        {% endfor %}
+        {% if complaint_pagination.has_next %}<a class="btn btn-sm btn-outline" href="?page={{ complaint_pagination.next_num }}">Next</a>{% endif %}
+      </div>
+      {% endif %}
+    {% else %}<p>No complaints are currently assigned to this department.</p>{% endif %}
+  </div>
+</div>
+{% endblock %}

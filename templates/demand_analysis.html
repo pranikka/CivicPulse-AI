@@ -1,0 +1,616 @@
+{% extends "base.html" %}
+
+{% block title %}Demand Analysis - CivicPulse AI{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <h1>Demand Analysis Dashboard</h1>
+    <p>Real-time insights from citizen requests</p>
+</div>
+
+<div class="container">
+{% if smart_stats %}
+<div class="chart-card">
+    <h2>Smart Officer Dashboard</h2>
+    <p>Operational queue for requests officially assigned to you or your authorized department.</p>
+    <div class="dashboard-stats">
+        <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-content"><div class="stat-value" id="smartAssigned">{{ smart_stats.assigned }}</div><div class="stat-label">Assigned / Department Queue</div></div></div>
+        <div class="stat-card"><div class="stat-icon">⏳</div><div class="stat-content"><div class="stat-value" id="smartPending">{{ smart_stats.pending }}</div><div class="stat-label">Pending</div></div></div>
+        <div class="stat-card"><div class="stat-icon">🚨</div><div class="stat-content"><div class="stat-value" id="smartCritical">{{ smart_stats.critical }}</div><div class="stat-label">Critical</div></div></div>
+        <div class="stat-card"><div class="stat-icon">⚠️</div><div class="stat-content"><div class="stat-value" id="smartHighCritical">{{ smart_stats.high_critical }}</div><div class="stat-label">High / Critical</div></div></div>
+        <div class="stat-card"><div class="stat-icon">⚠️</div><div class="stat-content"><div class="stat-value" id="smartOverdue">{{ smart_stats.overdue }}</div><div class="stat-label">Overdue</div></div></div>
+        <div class="stat-card"><div class="stat-icon">📅</div><div class="stat-content"><div class="stat-value" id="smartDueToday">{{ smart_stats.due_today }}</div><div class="stat-label">Due Today</div></div></div>
+        <div class="stat-card"><div class="stat-icon">✅</div><div class="stat-content"><div class="stat-value" id="smartResolved">{{ smart_stats.resolved }}</div><div class="stat-label">Resolved</div></div></div>
+        <div class="stat-card"><div class="stat-icon">⏱️</div><div class="stat-content"><div class="stat-value" id="smartAvgResolution">{{ smart_stats.average_resolution_hours if smart_stats.average_resolution_hours is not none else '—' }}</div><div class="stat-label">Avg Resolution (h)</div></div></div>
+    </div>
+    <div class="chart-card" style="margin-top:18px;">
+        <h3>Find an Assigned Complaint</h3>
+        <p class="review-note">Search the complete officer queue. You can open any assigned complaint, not only the 10 shown in the priority preview.</p>
+        <form method="GET" action="/officer/complaints" class="filter-form" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+            <input class="filter-input" type="text" name="complaint_id" placeholder="Enter Complaint ID (example: CP-...)" aria-label="Complaint ID">
+            <input class="filter-input" type="search" name="keyword" placeholder="Search title or description" aria-label="Keyword">
+            <button type="submit" class="btn btn-primary">Search Assigned Complaints</button>
+            <a class="btn btn-outline" href="/officer/complaints">View All {{ smart_stats.assigned }} Assigned</a>
+        </form>
+    </div>
+
+    <h3>Priority Queue</h3>
+    {% if smart_stats.recent_assigned %}
+    <div class="category-breakdown">
+    {% for item in smart_stats.recent_assigned %}
+        <div class="category-item">
+            <span class="category-name"><a href="{{ url_for('complaint_details', request_id=item.request_id) }}">{{ item.request_id }}</a> — {{ item.title or item.category }}</span>
+            <span class="category-count">{{ item.status }}{% if item.analysis and item.analysis.priority %} · {{ item.analysis.priority_override or item.analysis.priority }}{% endif %}</span>
+        </div>
+    {% endfor %}
+    </div>
+    {% else %}<p>No complaints are currently assigned to this officer.</p>{% endif %}
+</div>
+{% endif %}
+
+<div class="chart-card">
+    <h2>AI / Statistical Demand Prediction</h2>
+    <p>Forecasts use only historical complaint records. No fake or seeded prediction data is generated.</p>
+    <div id="demandPrediction"><p>Loading demand prediction...</p></div>
+</div>
+
+    <div class="dashboard-stats">
+        <div class="stat-card">
+            <div class="stat-icon">📊</div>
+            <div class="stat-content">
+                <div class="stat-value">{{ stats.total_requests }}</div>
+                <div class="stat-label">Total Requests</div>
+            </div>
+        </div>
+
+    <div class="stat-card">
+        <div class="stat-icon">✅</div>
+        <div class="stat-content">
+            <div class="stat-value">{{ stats.analyzed_requests }}</div>
+            <div class="stat-label">Analyzed</div>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon">⏳</div>
+        <div class="stat-content">
+            <div class="stat-value">{{ stats.pending_requests }}</div>
+            <div class="stat-label">Pending Analysis</div>
+        </div>
+    </div>
+</div>
+
+<div class="dashboard-grid">
+    <div class="chart-card">
+        <h3>Requests by Category</h3>
+        <div style="height:300px;position:relative;"><canvas id="categoryChart"></canvas></div>
+    </div>
+    
+    <div class="chart-card">
+        <h3>Requests by Urgency</h3>
+        <div style="height:300px;position:relative;"><canvas id="urgencyChart"></canvas></div>
+    </div>
+</div>
+
+<div class="chart-card">
+    <h3>Filter Dashboard</h3>
+    <form class="filter-form" id="filterForm">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+        <div class="filter-row">
+            <select id="stateFilter" class="filter-input"><option value="">All States</option></select>
+            
+            <select id="districtFilter" class="filter-input">
+                <option value="">All Districts</option>
+            </select>
+            
+            <select id="categoryFilter" class="filter-input"><option value="">All Categories</option></select>
+            
+            <button type="submit" class="btn btn-sm btn-secondary">Apply Filters</button>
+        </div>
+    </form>
+</div>
+
+<div class="chart-card">
+    <h3>Top Categories</h3>
+    <div class="category-breakdown">
+        {% if top_categories %}
+            {% for cat in top_categories %}
+                <div class="category-item">
+                    <span class="category-name">{{ cat.category }}</span>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: {{ (cat.count / top_categories[0].count * 100)|int }}%"></div>
+                    </div>
+                    <span class="category-count">{{ cat.count }} requests</span>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p>No category data available.</p>
+        {% endif %}
+    </div>
+</div>
+
+    <div class="chart-card">
+        <h2>Advanced Analytics</h2>
+        <p>Real-time analytics calculated from complaint records and existing AI analysis.</p>
+
+        <form class="filter-form" id="advancedFilterForm">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            <div class="filter-row" style="flex-wrap:wrap;">
+                <input type="date" id="advancedStartDate" class="filter-input" aria-label="Start date">
+                <input type="date" id="advancedEndDate" class="filter-input" aria-label="End date">
+                <select id="advancedCategory" class="filter-input">
+                    <option value="">All Categories</option>
+                </select>
+                <select id="advancedDepartment" class="filter-input">
+                    <option value="">All Departments</option>
+                </select>
+                <select id="advancedStatus" class="filter-input">
+                    <option value="">All Statuses</option>
+                    <option value="Submitted">Submitted</option>
+                    <option value="Analyzed">Analyzed</option>
+                    <option value="Pending">Pending</option>
+                    <option value="In-Progress">In-Progress</option>
+                    <option value="Resolved">Resolved</option>
+                </select>
+                <select id="advancedPriority" class="filter-input">
+                    <option value="">All Priorities</option>
+                    <option value="Critical">Critical</option>
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                </select>
+                <input type="text" id="advancedLocation" class="filter-input" placeholder="Location / Ward">
+                <button type="submit" class="btn btn-sm btn-secondary">Apply Analytics Filters</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="dashboard-stats" id="advancedStatsCards">
+        <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-content"><div class="stat-value" id="advTotal">0</div><div class="stat-label">Total Complaints</div></div></div>
+        <div class="stat-card"><div class="stat-icon">✅</div><div class="stat-content"><div class="stat-value" id="advResolved">0</div><div class="stat-label">Resolved</div></div></div>
+        <div class="stat-card"><div class="stat-icon">⏳</div><div class="stat-content"><div class="stat-value" id="advPending">0</div><div class="stat-label">Pending</div></div></div>
+        <div class="stat-card"><div class="stat-icon">🚨</div><div class="stat-content"><div class="stat-value" id="advCritical">0</div><div class="stat-label">Critical</div></div></div>
+        <div class="stat-card"><div class="stat-icon">📈</div><div class="stat-content"><div class="stat-value" id="advRate">0%</div><div class="stat-label">Resolution Rate</div></div></div>
+        <div class="stat-card"><div class="stat-icon">⏱️</div><div class="stat-content"><div class="stat-value" id="advAvgTime">—</div><div class="stat-label">Avg Resolution Time</div></div></div>
+    </div>
+
+    <div class="dashboard-grid">
+        <div class="chart-card"><h3>Complaints by Department</h3><canvas id="departmentAnalyticsChart"></canvas></div>
+        <div class="chart-card"><h3>Priority Distribution</h3><canvas id="priorityAnalyticsChart"></canvas></div>
+        <div class="chart-card"><h3>Complaints by Location/Ward</h3><canvas id="locationAnalyticsChart"></canvas></div>
+        <div class="chart-card"><h3>Complaints by Month</h3><canvas id="monthlyAnalyticsChart"></canvas></div>
+    </div>
+
+    <div class="chart-card">
+        <h3>Department Workload</h3>
+        <div id="departmentWorkload"></div>
+        <p id="satisfactionMetric" class="review-note"></p>
+    </div>
+
+    <div class="chart-card">
+        <h2>Area / Ward Analytics</h2>
+        <p>Actual complaint metrics grouped by state, district and local area/ward.</p>
+        <div id="areaAnalyticsTable"><p>Loading area analytics...</p></div>
+    </div>
+
+    <div class="chart-card">
+        <h2>Civic Hotspot Detection</h2>
+        <p>Actual complaint concentrations by area/ward, with recent trend and severity.</p>
+        <div id="demandHotspotsTable"><p>Loading hotspot data...</p></div>
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script src="{{ url_for('static', filename='js/chart-config.js') }}"></script>
+
+<script>
+    let categoryChartInstance = null;
+    let urgencyChartInstance = null;
+
+    function showChartEmpty(canvasId, message) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+        const card = canvas.closest('.chart-card');
+        if (!card) return;
+        let empty = card.querySelector('.chart-empty-message');
+        if (!empty) {
+            empty = document.createElement('p');
+            empty.className = 'chart-empty-message form-hint';
+            empty.style.marginTop = '12px';
+            card.appendChild(empty);
+        }
+        empty.textContent = message;
+        canvas.style.display = 'none';
+    }
+
+    function showChartCanvas(canvasId) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+        canvas.style.display = '';
+        const card = canvas.closest('.chart-card');
+        const empty = card?.querySelector('.chart-empty-message');
+        if (empty) empty.remove();
+    }
+
+    async function loadGeoFilters(){
+        try{
+            const geo=await fetch('/api/geo/options', {headers:{'Accept':'application/json'}}).then(r=>{
+                if(!r.ok) throw new Error('Geo options HTTP '+r.status);
+                return r.json();
+            });
+            const state=document.getElementById('stateFilter');
+            const district=document.getElementById('districtFilter');
+            const category=document.getElementById('categoryFilter');
+            if(!state || !district || !category) return;
+
+            const states=Object.keys(geo).sort((a,b)=>a.localeCompare(b));
+            state.innerHTML='<option value="">All States</option>'+states.map(x=>`<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join('');
+
+            const initialCategories = Object.keys({{ stats.category_distribution|tojson }});
+            const categories=[...new Set(initialCategories.concat([
+                'Roads & Transport','Healthcare','Education','Water & Sanitation',
+                'Digital Connectivity','Electricity','Public Facilities','Other'
+            ]))].sort((a,b)=>a.localeCompare(b));
+            category.innerHTML='<option value="">All Categories</option>'+categories.map(x=>`<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join('');
+
+            function updateDistricts(){
+                const selectedState = state.value;
+                const districts = selectedState ? (geo[selectedState] || []) : [...new Set(Object.values(geo).flat())].sort((a,b)=>a.localeCompare(b));
+                const current = district.value;
+                district.innerHTML='<option value="">All Districts</option>'+districts.map(x=>`<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join('');
+                if (districts.includes(current)) district.value=current;
+            }
+            state.addEventListener('change', async ()=>{ updateDistricts(); await loadDashboardStats(); });
+            district.addEventListener('change', ()=>loadDashboardStats().catch(console.error));
+            category.addEventListener('change', ()=>loadDashboardStats().catch(console.error));
+            updateDistricts();
+        }catch(e){
+            console.error('Geo filter load failed',e);
+        }
+    }
+
+    async function loadDashboardStats(){
+        const params=new URLSearchParams();
+        ['state','district','category'].forEach((k)=>{
+            const id=k+'Filter';
+            const el=document.getElementById(id);
+            if(el && el.value) params.set(k,el.value);
+        });
+        const response=await fetch('/api/dashboard/stats?'+params.toString(), {headers:{'Accept':'application/json'}});
+        if(!response.ok) throw new Error('Dashboard statistics unavailable');
+        const data=await response.json();
+
+        const smartUpdates = {
+            smartAssigned: data.total_requests ?? 0,
+            smartPending: data.pending_requests ?? 0,
+            smartCritical: data.critical_requests ?? 0,
+            smartHighCritical: data.high_critical_requests ?? 0,
+            smartOverdue: data.overdue_requests ?? 0,
+            smartDueToday: data.due_today_requests ?? 0,
+            smartResolved: data.resolved_requests ?? 0
+        };
+        Object.entries(smartUpdates).forEach(([id, value]) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = value;
+        });
+        const avgEl = document.getElementById('smartAvgResolution');
+        if (avgEl) avgEl.textContent = data.average_resolution_hours == null ? '—' : data.average_resolution_hours;
+        const totalEl=document.querySelector('.dashboard-stats .stat-card .stat-value');
+        if(totalEl) totalEl.textContent=data.total_requests ?? 0;
+        const values=document.querySelectorAll('.dashboard-stats .stat-card .stat-value');
+        if(values[1]) values[1].textContent=data.analyzed_requests ?? 0;
+        if(values[2]) values[2].textContent=data.pending_requests ?? 0;
+
+        renderCategoryChart(data.category_distribution || {});
+        renderUrgencyChart(data.urgency_distribution || {});
+    }
+
+    document.getElementById('filterForm')?.addEventListener('submit',async (event)=>{
+        event.preventDefault();
+        try{ await loadDashboardStats(); }
+        catch(e){ console.error('Filter dashboard update failed:',e); }
+    });
+
+    function renderCategoryChart(data) {
+        if (categoryChartInstance) categoryChartInstance.destroy();
+        const entries=Object.entries(data).filter(([,v])=>Number(v)>0);
+        if (!entries.length) {
+            showChartEmpty('categoryChart','No category data available for the selected filters.');
+            return;
+        }
+        showChartCanvas('categoryChart');
+        const canvas=document.getElementById('categoryChart');
+        categoryChartInstance = new Chart(canvas.getContext('2d'), {
+            type:'bar',
+            data:{
+                labels:entries.map(([k])=>k),
+                datasets:[{
+                    label:'Requests',
+                    data:entries.map(([,v])=>Number(v)),
+                    backgroundColor:'#1e3a8a',
+                    borderRadius:4
+                }]
+            },
+            options:{
+                responsive:true,
+                maintainAspectRatio:false,
+                plugins:{legend:{display:true}},
+                scales:{y:{beginAtZero:true,ticks:{precision:0}}}
+            }
+        });
+    }
+
+    function renderUrgencyChart(data) {
+        if (urgencyChartInstance) urgencyChartInstance.destroy();
+        const entries=Object.entries(data).filter(([,v])=>Number(v)>0);
+        if (!entries.length) {
+            showChartEmpty('urgencyChart','No urgency data available for the selected filters.');
+            return;
+        }
+        showChartCanvas('urgencyChart');
+        const colors={'Low':'#22c55e','Moderate':'#f59e0b','Medium':'#f59e0b','High':'#ef4444','Critical':'#991b1b'};
+        const canvas=document.getElementById('urgencyChart');
+        urgencyChartInstance = new Chart(canvas.getContext('2d'), {
+            type:'doughnut',
+            data:{
+                labels:entries.map(([k])=>k),
+                datasets:[{
+                    data:entries.map(([,v])=>Number(v)),
+                    backgroundColor:entries.map(([k])=>colors[k]||'#64748b'),
+                    borderColor:'#fff',
+                    borderWidth:2
+                }]
+            },
+            options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'bottom'}}}
+        });
+    }
+
+    loadGeoFilters();
+    loadDashboardStats().catch(error => console.error('Error loading dashboard statistics:', error));
+
+    const analyticsCharts = {};
+
+    function destroyAnalyticsCharts() {
+        Object.values(analyticsCharts).forEach(chart => chart && chart.destroy());
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, ch => ({
+            '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+        }[ch]));
+    }
+
+    function fillSelect(selectId, values) {
+        const select = document.getElementById(selectId);
+        if (!select) return;
+        const current = select.value;
+        const first = select.options[0].outerHTML;
+        select.innerHTML = first + values.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+        if (values.includes(current)) select.value = current;
+    }
+
+    async function loadAdvancedAnalytics() {
+        const params = new URLSearchParams();
+        const mappings = {
+            advancedStartDate: 'start_date',
+            advancedEndDate: 'end_date',
+            advancedCategory: 'category',
+            advancedDepartment: 'department',
+            advancedStatus: 'status',
+            advancedPriority: 'priority',
+            advancedLocation: 'location'
+        };
+        Object.entries(mappings).forEach(([id, key]) => {
+            const value = document.getElementById(id)?.value || '';
+            if (value) params.set(key, value);
+        });
+
+        const data = await window.CivicPulse.safeFetch('/api/dashboard/advanced-stats?' + params.toString());
+        if (!data) return;
+
+        document.getElementById('advTotal').textContent = data.total_complaints;
+        document.getElementById('advResolved').textContent = data.resolved_complaints;
+        document.getElementById('advPending').textContent = data.pending_complaints;
+        document.getElementById('advCritical').textContent = data.critical_complaints;
+        document.getElementById('advRate').textContent = `${data.resolution_rate}%`;
+        document.getElementById('advAvgTime').textContent =
+            data.average_resolution_hours === null ? '—' : `${data.average_resolution_hours} h`;
+
+        fillSelect('advancedCategory', Object.keys(data.category_distribution));
+        fillSelect('advancedDepartment', Object.keys(data.department_distribution));
+
+        destroyAnalyticsCharts();
+
+        analyticsCharts.department = new Chart(document.getElementById('departmentAnalyticsChart'), {
+            type: 'bar',
+            data: { labels: Object.keys(data.department_distribution), datasets: [{ label: 'Complaints', data: Object.values(data.department_distribution), backgroundColor: '#1e3a8a' }] },
+            options: { responsive: true, plugins: { legend: { display: false } } }
+        });
+        analyticsCharts.priority = new Chart(document.getElementById('priorityAnalyticsChart'), {
+            type: 'doughnut',
+            data: { labels: Object.keys(data.priority_distribution), datasets: [{ data: Object.values(data.priority_distribution) }] },
+            options: { responsive: true }
+        });
+        analyticsCharts.location = new Chart(document.getElementById('locationAnalyticsChart'), {
+            type: 'bar',
+            data: { labels: Object.keys(data.location_distribution), datasets: [{ label: 'Complaints', data: Object.values(data.location_distribution), backgroundColor: '#3b82f6' }] },
+            options: { responsive: true, indexAxis: 'y', plugins: { legend: { display: false } } }
+        });
+        analyticsCharts.monthly = new Chart(document.getElementById('monthlyAnalyticsChart'), {
+            type: 'line',
+            data: { labels: Object.keys(data.monthly_distribution), datasets: [{ label: 'Complaints', data: Object.values(data.monthly_distribution), borderColor: '#1e3a8a', backgroundColor: 'rgba(30,58,138,.1)', fill: true }] },
+            options: { responsive: true }
+        });
+
+        const workload = document.getElementById('departmentWorkload');
+        workload.innerHTML = Object.entries(data.department_distribution).map(([dept, count]) =>
+            `<div class="category-item"><span class="category-name">${escapeHtml(dept)}</span><div class="progress-bar"><div class="progress-fill" style="width:${data.total_complaints ? Math.round(count / data.total_complaints * 100) : 0}%"></div></div><span class="category-count">${count}</span></div>`
+        ).join('') || '<p>No department data available.</p>';
+
+        document.getElementById('satisfactionMetric').textContent =
+            data.citizen_satisfaction === null
+                ? 'Citizen satisfaction: feedback data is not available yet.'
+                : `Citizen satisfaction average: ${data.citizen_satisfaction}`;
+    }
+
+    async function loadAreaAnalytics() {
+        const target = document.getElementById('areaAnalyticsTable');
+        if (!target) return;
+        const data = await window.CivicPulse.safeFetch('/api/analytics/areas');
+        if (!data) return;
+        if (!data.length) {
+            target.innerHTML = '<p>No area/ward complaint data is available yet.</p>';
+            return;
+        }
+        target.innerHTML = `
+            <div style="overflow:auto;">
+            <table>
+                <thead><tr>
+                    <th>Area/Ward</th><th>District</th><th>Total</th><th>Pending</th>
+                    <th>Resolved</th><th>Critical</th><th>Top Category</th>
+                    <th>Resolution Rate</th><th>Avg Resolution</th><th>Recent Trend</th>
+                </tr></thead>
+                <tbody>${data.map(row => `
+                    <tr>
+                        <td>${escapeHtml(row.area)}</td>
+                        <td>${escapeHtml(row.district)}</td>
+                        <td>${row.total}</td>
+                        <td>${row.pending}</td>
+                        <td>${row.resolved}</td>
+                        <td>${row.critical}</td>
+                        <td>${escapeHtml(row.top_category)}</td>
+                        <td>${row.resolution_rate}%</td>
+                        <td>${row.average_resolution_hours === null ? '—' : row.average_resolution_hours + ' h'}</td>
+                        <td>${escapeHtml(row.recent_trend)} <small>(${row.recent_30_days} / ${row.previous_30_days})</small></td>
+                    </tr>`).join('')}</tbody>
+            </table></div>`;
+    }
+
+    async function loadDemandHotspots() {
+        const data = await window.CivicPulse.safeFetch('/api/civic-hotspots');
+        if (!data) return;
+        const target = document.getElementById('demandHotspotsTable');
+        if (!data.length) {
+            target.innerHTML = '<p>No complaint hotspot data is available yet.</p>';
+            return;
+        }
+        target.innerHTML = `
+            <table>
+                <thead><tr><th>Rank</th><th>Area/Ward</th><th>District</th><th>Complaints</th><th>Main Issue</th><th>Category Distribution</th><th>Priority Distribution</th><th>Trend</th><th>Severity</th></tr></thead>
+                <tbody>${data.slice(0, 10).map((h, i) => `
+                    <tr>
+                        <td><strong>#${i + 1}</strong></td>
+                        <td>${escapeHtml(h.area)}</td><td>${escapeHtml(h.district)}</td><td>${h.count}</td>
+                        <td>${escapeHtml(h.main_issue)}</td><td>${Object.entries(h.category_distribution).map(([k,v]) => `${escapeHtml(k)}: ${v}`).join(', ')}</td><td>${Object.entries(h.priority_distribution).map(([k,v]) => `${escapeHtml(k)}: ${v}`).join(', ')}</td><td>${escapeHtml(h.trend)}</td><td>${escapeHtml(h.severity)}</td>
+                    </tr>`).join('')}</tbody>
+            </table>`;
+    }
+
+    document.getElementById('advancedFilterForm')?.addEventListener('submit', function (event) {
+        event.preventDefault();
+        loadAdvancedAnalytics();
+    });
+
+    async function loadDemandPrediction() {
+        const target = document.getElementById('demandPrediction');
+        if (!target) return;
+        const data = await window.CivicPulse.safeFetch('/api/demand-prediction');
+        if (!data) return;
+        if (!data.sufficient_data) {
+            target.innerHTML = `<p class="review-note">${escapeHtml(data.message)}</p>`;
+            return;
+        }
+        const card = p => `<span class="category-count">${escapeHtml(p.trend)} · 7-day forecast: ${p.forecast} (${p.change_percent >= 0 ? '+' : ''}${p.change_percent}%)</span>`;
+        target.innerHTML = `
+            <div class="category-breakdown">
+                <div class="category-item"><span class="category-name">Overall demand</span>${card(data.overall)}</div>
+                ${data.thirty_day ? `<div class="category-item"><span class="category-name">30-day trend</span>${card(data.thirty_day)}</div>` : ''}
+            </div>
+            <h3>Category Demand</h3>
+            <div class="category-breakdown">${data.category_predictions.length ? data.category_predictions.map(p => `<div class="category-item"><span class="category-name">${escapeHtml(p.name)}</span>${card(p)}</div>`).join('') : '<p>Insufficient historical data for category-level prediction.</p>'}</div>
+            <h3>Area/Ward Demand</h3>
+            <div class="category-breakdown">${data.area_predictions.length ? data.area_predictions.map(p => `<div class="category-item"><span class="category-name">${escapeHtml(p.name)}</span>${card(p)}</div>`).join('') : '<p>Insufficient historical data for area-level prediction.</p>'}</div>`;
+    }
+
+    loadAdvancedAnalytics();
+    loadAreaAnalytics();
+    loadDemandHotspots();
+    loadDemandPrediction();
+</script>
+
+
+<div class="chart-card" style="margin-top:24px;">
+    <h2>Demand Trend Analysis</h2>
+    <p>Trend values are calculated from stored request records. Select a period and optional filters.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <select id="trendPeriod" class="filter-input"><option value="7d">7 days</option><option value="30d" selected>30 days</option><option value="90d">90 days</option><option value="1y">1 year</option></select>
+        <select id="trendCategory" class="filter-input"><option value="">All categories</option>{% for cat in trend_categories %}<option value="{{ cat }}">{{ cat|title }}</option>{% endfor %}</select>
+        <input id="trendLocation" class="filter-input" placeholder="Area / district">
+        <select id="trendDepartment" class="filter-input"><option value="">All departments</option>{% for dep in trend_departments %}<option>{{ dep }}</option>{% endfor %}</select>
+        <select id="trendPriority" class="filter-input"><option value="">All priorities</option><option>Low</option><option>Medium</option><option>High</option><option>Critical</option></select>
+        <select id="trendStatus" class="filter-input"><option value="">All statuses</option><option>Submitted</option><option>Analyzed</option><option>Pending</option><option>In-Progress</option><option>Resolved</option></select>
+        <button class="btn btn-secondary" id="loadTrend">Apply</button>
+    </div>
+    <div id="trendOutput" style="margin-top:16px;">Loading trend data…</div>
+</div>
+
+<div class="chart-card" style="margin-top:24px;">
+    <h2>Emerging Civic Issues</h2>
+    <p>Analytics insight comparing the latest 30 days with the preceding 30 days. Small datasets are treated cautiously.</p>
+    <div id="emergingIssues">Loading…</div>
+</div>
+
+<div class="chart-card" style="margin-top:24px;">
+    <h2>SLA Overview</h2>
+    <div id="slaOverview">Loading…</div>
+</div>
+
+<div class="chart-card" style="margin-top:24px;">
+    <h2>Infrastructure-gap signals</h2>
+    <p>Potential development attention areas derived from demand and available infrastructure/project records.</p>
+    <div id="gapOverview">Loading…</div>
+</div>
+
+<script>
+(async function(){
+  function esc(v){return String(v ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+  async function loadTrend(){
+    const p=new URLSearchParams({period:document.getElementById('trendPeriod').value});
+    const pairs={category:'trendCategory',location:'trendLocation',department:'trendDepartment',priority:'trendPriority',status:'trendStatus'};
+    Object.entries(pairs).forEach(([k,id])=>{const v=document.getElementById(id)?.value;if(v)p.set(k,v);});
+    const r=await fetch('/api/analytics/trends?'+p.toString()); const d=await r.json();
+    if(!r.ok){document.getElementById('trendOutput').textContent=d.error||'Unable to load trends.';return;}
+    const max=Math.max(1,...d.series.map(x=>x.count));
+    document.getElementById('trendOutput').innerHTML='<p><strong>'+d.total+'</strong> requests in this period.</p>'+
+      '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:6px;align-items:end;">'+
+      d.series.map(x=>'<div title="'+esc(x.date)+': '+x.count+'" style="text-align:center;"><div style="height:'+Math.max(6,(x.count/max)*100)+'px;background:currentColor;opacity:.35;border-radius:4px;"></div><small>'+esc(x.date.slice(5))+'</small><br><strong>'+x.count+'</strong></div>').join('')+'</div>';
+  }
+  document.getElementById('loadTrend').addEventListener('click',loadTrend);
+  loadTrend();
+
+  try{
+    const r=await fetch('/api/analytics/emerging-issues'); const d=await r.json();
+    document.getElementById('emergingIssues').innerHTML=d.issues?.length?d.issues.map(x=>'<div class="category-item"><span><strong>'+esc(x.issue)+'</strong> · '+esc(x.evidence)+'<br><small>Areas: '+esc(x.affected_areas.map(a=>a[0]).join(', '))+'</small></span><strong>+'+x.change_percent+'%</strong></div>').join(''):'<p>No emerging issue meets the current evidence threshold.</p>';
+  }catch(e){document.getElementById('emergingIssues').textContent='Unable to load emerging-issue analytics.';}
+
+  try{
+    const r=await fetch('/api/sla/overview'); const d=await r.json();
+    document.getElementById('slaOverview').innerHTML='<div class="dashboard-stats">'+Object.entries(d.counts||{}).map(([k,v])=>'<div class="stat-card"><div class="stat-content"><div class="stat-value">'+v+'</div><div class="stat-label">'+esc(k.replace('_',' '))+'</div></div></div>').join('')+'</div>';
+  }catch(e){document.getElementById('slaOverview').textContent='Unable to load SLA status.';}
+
+  try{
+    const r=await fetch('/api/analytics/infrastructure-gaps'); const d=await r.json();
+    document.getElementById('gapOverview').innerHTML=d.length?d.slice(0,10).map(x=>'<div class="category-item"><span>'+esc(x.area)+'<br><small>'+x.request_count+' requests · '+x.high_priority+' high/critical · '+x.existing_projects+' recorded projects</small></span><strong>'+esc(x.potential_attention?'Potential development attention area':'Insufficient evidence')+'</strong></div>').join(''):'<p>No infrastructure-gap evidence is available.</p>';
+  }catch(e){document.getElementById('gapOverview').textContent='Unable to load infrastructure analytics.';}
+})();
+</script>
+
+{% endblock %}
+

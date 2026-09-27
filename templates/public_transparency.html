@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Public Transparency - CivicPulse AI{% endblock %}
+{% block content %}
+<div class="page-header"><h1>Public Transparency Dashboard</h1><p>Aggregated CivicPulse statistics based on available data. Personal information is intentionally excluded.</p></div>
+<div class="container">
+<div class="dashboard-stats">
+<div class="stat-card"><div class="stat-content"><div class="stat-value">{{ total }}</div><div class="stat-label">Total civic requests</div></div></div>
+<div class="stat-card"><div class="stat-content"><div class="stat-value">{{ resolved }}</div><div class="stat-label">Resolved requests</div></div></div>
+<div class="stat-card"><div class="stat-content"><div class="stat-value">{{ ((resolved/total*100)|round(1)) if total else 'Not enough data' }}{% if total %}%{% endif %}</div><div class="stat-label">Resolution rate</div></div></div>
+<div class="stat-card"><div class="stat-content"><div class="stat-value">{{ ratings if ratings is not none else 'Not enough data' }}{% if ratings is not none %}/5{% endif %}</div><div class="stat-label">Citizen satisfaction</div></div></div>
+</div>
+<div class="dashboard-grid"><div class="chart-card"><h2>Major categories</h2><table><tr><th>Category</th><th>Requests</th></tr>{% for cat,count in categories %}<tr><td>{{ cat }}</td><td>{{ count }}</td></tr>{% else %}<tr><td colspan="2">Not enough data.</td></tr>{% endfor %}</table></div>
+<div class="chart-card"><h2>Recent request trend</h2><table><tr><th>Date</th><th>Requests</th></tr>{% for date,count in trends %}<tr><td>{{ date }}</td><td>{{ count }}</td></tr>{% else %}<tr><td colspan="2">Not enough data.</td></tr>{% endfor %}</table></div></div>
+<div class="chart-card"><p>Statistics are based on available CivicPulse data and may not represent all civic needs. No names, emails, phone numbers, private addresses, complaint details or sensitive evidence are exposed here.</p></div>
+</div>{% endblock %}

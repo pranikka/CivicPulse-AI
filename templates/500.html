@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Server Error - CivicPulse AI{% endblock %}
+
+{% block content %}
+
+<div class="error-container">
+    <div class="error-card error-severe">
+        <div class="error-code">500</div>
+        <h1>Server Error</h1>
+        <p>Something went wrong on our end. Our team has been notified and is working to fix it.</p>
+        
+        <div class="error-actions">
+            <a href="/" class="btn btn-primary">Go Home</a>
+            <a href="javascript:history.back()" class="btn btn-secondary">Go Back</a>
+        </div>
+        
+        <p class="error-support">If the problem persists, please <a href="mailto:support@civicpulse.ai">contact support</a>.</p>
+    </div>
+</div>
+
+{% endblock %}

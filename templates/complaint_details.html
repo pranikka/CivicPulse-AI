@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+{% block title %}Complaint {{ complaint.request_id }} - CivicPulse AI{% endblock %}
+{% block content %}
+<div class="page-header"><h1>{{ complaint.title or complaint.request_id }}</h1><p>Complaint ID: {{ complaint.request_id }}</p></div>
+<div class="container">
+    <div class="request-card request-detail-card">
+        <div class="request-header">
+            <div><span class="status-badge status-{{ complaint.status|lower }}">{{ complaint.status }}</span> <span class="status-badge">Priority: {{ complaint.analysis.priority_override or complaint.analysis.priority if complaint.analysis else 'Low' }}</span></div>
+            <span class="review-note">{{ complaint.request_id }}</span>
+        </div>
+        <div class="request-detail-grid">
+            <section class="detail-section"><h3>Request Information</h3>
+                <div class="detail-row"><strong>Request ID</strong><span>{{ complaint.request_id }}</span></div>
+                <div class="detail-row"><strong>Request title</strong><span>{{ complaint.title or 'Citizen Request' }}</span></div>
+                <div class="detail-row"><strong>Category</strong><span>{{ complaint.category }}</span></div>
+                <div class="detail-row"><strong>Date</strong><span>{{ complaint.created_at.strftime('%B %d, %Y at %I:%M %p') if complaint.created_at else '—' }}</span></div>
+            </section>
+            <section class="detail-section"><h3>Location &amp; Assignment</h3>
+                <div class="detail-row"><strong>Location</strong><span>{{ complaint.local_area }}, {{ complaint.district }}, {{ complaint.state }}</span></div>
+                <div class="detail-row"><strong>AI recommended department</strong><span>{{ assignment.ai_recommended_department or 'No AI recommendation available' }}</span></div>
+                <div class="detail-row"><strong>Official department</strong><span>{{ assignment.official_department or 'Pending / Unassigned' }}</span></div>
+                <div class="detail-row"><strong>Assigned officer</strong><span>{{ complaint.assigned_officer.username if complaint.assigned_officer and current_user.role in ('Officer','Admin') else 'Not Assigned' }}</span></div>
+            </section>
+            <section class="detail-section detail-section-wide"><h3>Description</h3><p>{{ complaint.description }}</p></section>
+            <section class="detail-section"><h3>Status &amp; SLA</h3>
+                <div class="detail-row"><strong>Status</strong><span>{{ complaint.status }}</span></div>
+                <div class="detail-row"><strong>Priority</strong><span>{{ complaint.analysis.priority_override or complaint.analysis.priority if complaint.analysis else 'Low' }}</span></div>
+                <div class="detail-row"><strong>SLA due</strong><span>{{ complaint.due_at.strftime('%B %d, %Y at %I:%M %p') if complaint.due_at else '—' }}</span></div>
+                <div class="detail-row"><strong>SLA status</strong><span class="{% if sla_info.status in ['Overdue','Breached'] %}sla-overdue{% elif sla_info.status == 'Compliant' %}sla-compliant{% endif %}">{{ sla_info.status }}</span></div>
+            </section>
+            <section class="detail-section"><h3>Citizen Contact</h3>
+                <div class="detail-row"><strong>Phone</strong><span>{{ 'Hidden (anonymous)' if complaint.is_anonymous else (complaint.contact_phone or 'Not provided') }}</span></div>
+                <div class="detail-row"><strong>Email</strong><span>{{ 'Hidden (anonymous)' if complaint.is_anonymous else (complaint.contact_email or 'Not provided') }}</span></div>
+            </section>
+            <section class="detail-section"><h3>Evidence / Attachments</h3>
+                {% if complaint.photo_filename or complaint.video_filename or complaint.evidence_filename %}<div class="detail-links">{% if complaint.photo_filename %}<a href="{{ url_for('complaint_media', filename=complaint.photo_filename) }}" target="_blank">Photo</a>{% endif %}{% if complaint.video_filename %}<a href="{{ url_for('complaint_media', filename=complaint.video_filename) }}" target="_blank">Video</a>{% endif %}{% if complaint.evidence_filename %}<a href="{{ url_for('complaint_media', filename=complaint.evidence_filename) }}" target="_blank">Evidence</a>{% endif %}</div>{% else %}<p>No general attachments uploaded.</p>{% endif %}
+            </section>
+        </div>
+        {% if assignment.official_assignment_pending %}<p class="review-note">AI recommendation exists, but official government assignment is still pending.</p>{% endif %}
+        <p class="review-note">AI-generated recommendation • Human review required.</p>
+        {% if complaint.officer_remarks %}<div class="info-box"><strong>Latest officer remarks:</strong><p>{{ complaint.officer_remarks }}</p></div>{% endif %}
+    </div>
+
+    <div class="chart-card" style="margin-top:24px;">
+        <h2>Request Lifecycle</h2>
+        <div class="timeline">
+        {% for item in lifecycle_events %}
+            <div class="timeline-item" style="padding:12px 0;border-bottom:1px solid #eee;">
+                <strong>{{ item.label }}</strong>
+                <p>{{ item.description }}</p>
+                <small>{{ item.created_at.strftime('%B %d, %Y at %I:%M %p') }}</small>
+            </div>
+        {% endfor %}
+        </div>
+    </div>
+
+    <div class="chart-card" style="margin-top:24px;">
+        <h2>Complaint Timeline</h2>
+        {% if events %}
+        <div class="timeline">
+            {% for event in events %}
+            <div class="timeline-item" style="padding:14px 0;border-bottom:1px solid #eee;">
+                <div><strong>{{ event.event_type }}</strong></div>
+                <p>{{ event.description }}</p>
+                <small>{{ event.created_at.strftime('%B %d, %Y at %I:%M %p') }}{% if current_user.role in ('Officer','Admin') and event.actor %} · {{ event.actor.username }}{% if event.actor_role %} ({{ event.actor_role }}){% endif %}{% endif %}</small>
+                {% if event.evidence_filename %}<div><a href="{{ url_for('complaint_media', filename=event.evidence_filename) }}" target="_blank" rel="noopener">View evidence</a></div>{% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p>No historical timeline events are available for this older complaint.</p>
+        {% endif %}
+    </div>
+
+    <div class="chart-card" style="margin-top:24px;">
+        <h2>Before / After Resolution Evidence</h2>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px;">
+            <div>
+                <h3>Before Resolution</h3>
+                {% if complaint.before_evidence_filename %}
+                    <a href="{{ url_for('complaint_media', filename=complaint.before_evidence_filename) }}" target="_blank" rel="noopener">
+                        {% if complaint.before_evidence_filename.rsplit('.', 1)[-1]|lower in ['jpg','jpeg','png','webp'] %}<img src="{{ url_for('complaint_media', filename=complaint.before_evidence_filename) }}" alt="Before-resolution evidence" style="max-width:100%;max-height:260px;border-radius:8px;object-fit:contain;">{% else %}<span class="btn btn-sm btn-outline">View before evidence</span>{% endif %}
+                    </a>
+                {% else %}<p>No before-resolution evidence uploaded.</p>{% endif %}
+            </div>
+            <div>
+                <h3>After Resolution</h3>
+                {% if complaint.after_evidence_filename %}
+                    <a href="{{ url_for('complaint_media', filename=complaint.after_evidence_filename) }}" target="_blank" rel="noopener">
+                        {% if complaint.after_evidence_filename.rsplit('.', 1)[-1]|lower in ['jpg','jpeg','png','webp'] %}<img src="{{ url_for('complaint_media', filename=complaint.after_evidence_filename) }}" alt="After-resolution evidence" style="max-width:100%;max-height:260px;border-radius:8px;object-fit:contain;">{% else %}<span class="btn btn-sm btn-outline">View after evidence</span>{% endif %}
+                    </a>
+                {% else %}<p>No after-resolution evidence uploaded.</p>{% endif %}
+            </div>
+        </div>
+    </div>
+
+    {% if complaint.status == 'Resolved' and current_user.id == complaint.user_id %}
+    <div class="form-card" style="margin-top:24px;">
+        <h2>Citizen Feedback</h2>
+        {% if complaint.feedback %}
+            <p><strong>Feedback already submitted:</strong> {{ complaint.feedback.rating }}/5 — {{ complaint.feedback.satisfaction_level or '—' }}</p>
+            <p><strong>Issue resolved:</strong> {{ 'Yes' if complaint.feedback.issue_resolved else 'No' }}</p>
+            {% if complaint.feedback.comment %}<p>{{ complaint.feedback.comment }}</p>{% endif %}
+        {% else %}
+        <form method="POST" action="{{ url_for('submit_feedback', request_id=complaint.request_id) }}">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            <div class="form-group"><label>Rating</label>
+                <select name="rating" required><option value="">Select</option>{% for i in range(1,6) %}<option value="{{ i }}">{{ i }}/5</option>{% endfor %}</select>
+            </div>
+            <div class="form-group"><label>Satisfaction level</label>
+                <select name="satisfaction_level" required><option value="">Select</option><option>Very dissatisfied</option><option>Dissatisfied</option><option>Neutral</option><option>Satisfied</option><option>Very satisfied</option></select>
+            </div>
+            <div class="form-group"><label>Was the issue actually resolved?</label>
+                <select name="issue_resolved" required><option value="yes">Yes</option><option value="no">No</option></select>
+            </div>
+            <div class="form-group"><label>Comment (optional)</label><textarea name="comment" maxlength="2000" rows="3"></textarea></div>
+            <div class="form-group"><label>Would you like the issue reopened?</label>
+                <select name="reopened_requested" id="reopenSelect"><option value="no">No</option><option value="yes">Yes</option></select>
+            </div>
+            <div class="form-group" id="reopenReasonGroup" style="display:none;"><label>Why should it be reopened?</label><textarea name="reopened_reason" maxlength="1000" rows="3"></textarea></div>
+            <button class="btn btn-primary" type="submit">Submit Feedback</button>
+        </form>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if can_assign %}
+    <div class="form-card" style="margin-top:24px;">
+        <h2>Assignment</h2>
+        <form id="assignmentForm">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            <div class="form-group"><label>Department</label><select name="department" id="assignmentDepartment"><option value="">Pending / Unassigned</option>{% for department in departments %}<option value="{{ department.name }}" data-department-id="{{ department.id }}" {% if assignment.official_department_id == department.id %}selected{% endif %}>{{ department.name }}</option>{% endfor %}</select></div>
+            <div class="form-group"><label>Officer</label>
+                <select name="officer_id" id="assignmentOfficer"><option value="">Not Assigned</option>{% for officer in officers %}<option value="{{ officer.id }}" data-department-id="{{ officer.department_id or '' }}" {% if complaint.assigned_officer_id == officer.id %}selected{% endif %}>{{ officer.username }}{% if officer.department %} — {{ officer.department.name }}{% endif %}</option>{% endfor %}</select>
+            </div>
+            <div class="form-group"><label>Due date/time</label><input type="datetime-local" name="due_at" value="{{ complaint.due_at.strftime('%Y-%m-%dT%H:%M') if complaint.due_at else '' }}"></div>
+            <button class="btn btn-secondary" type="submit">Save Assignment</button>
+        </form>
+    </div>
+    {% endif %}
+
+    {% if can_update and complaint.analysis %}
+    <div class="form-card" style="margin-top:24px;">
+        <h2>Human Review of AI Analysis</h2>
+        <p>AI output is advisory. The authorized officer remains responsible for the final review.</p>
+        <p><strong>Current review status:</strong> {{ complaint.analysis.review_status or 'Review Required' }}</p>
+        <form id="reviewForm">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            <div class="form-group"><label>Decision</label>
+                <select name="decision" required>
+                    <option value="">Select decision</option>
+                    <option>Accepted</option><option>Modified</option><option>Rejected</option>
+                </select>
+            </div>
+            <div class="form-group"><label>Officer modification / review note</label>
+                <textarea name="modification" rows="4" maxlength="5000" placeholder="Required when choosing Modified; optional otherwise."></textarea>
+            </div>
+            <button class="btn btn-primary" type="submit">Save Human Review</button>
+        </form>
+    </div>
+    {% endif %}
+
+    {% if can_update %}
+    <div class="form-card" style="margin-top:24px;">
+        <h2>Officer Update</h2>
+        <form id="officerUpdateForm" enctype="multipart/form-data">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            <div class="form-group"><label>Status</label>
+                <select name="status">
+                    <option value="">Keep current status</option><option>Pending</option><option>In-Progress</option><option>Resolved</option><option>Analyzed</option>
+                </select>
+            </div>
+            <div class="form-group"><label>Remarks</label><textarea name="remarks" rows="4" maxlength="5000"></textarea></div>
+            <div class="form-group"><label>Priority override</label>
+                <select id="priorityOverride"><option value="">Keep automatic priority ({{ complaint.analysis.priority if complaint.analysis else 'Low' }})</option>{% for p in ['Low','Medium','High','Critical'] %}<option value="{{ p }}">{{ p }}</option>{% endfor %}</select>
+                {% if complaint.analysis %}<small class="form-hint">Original classification: {{ complaint.analysis.original_priority or complaint.analysis.priority or 'Low' }}{% if complaint.analysis.priority_override %}; current override: {{ complaint.analysis.priority_override }}{% endif %}</small>{% endif %}
+            </div>
+            <div class="form-group"><label>General Evidence</label><input type="file" name="evidence" accept=".jpg,.jpeg,.png,.webp,.pdf,.txt,.doc,.docx"></div>
+            <div class="form-group"><label>Before-resolution evidence</label><input type="file" id="beforeEvidence" name="before_evidence" accept=".jpg,.jpeg,.png,.webp,.pdf"><small class="form-hint">Maximum 10 MB. Image preview appears before upload.</small><div id="beforePreview"></div></div>
+            <div class="form-group"><label>After-resolution evidence</label><input type="file" id="afterEvidence" name="after_evidence" accept=".jpg,.jpeg,.png,.webp,.pdf"><small class="form-hint">Maximum 10 MB. Image preview appears before upload.</small><div id="afterPreview"></div></div>
+            <button class="btn btn-primary" type="submit">Save Update</button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const reopenSelect=document.getElementById('reopenSelect');
+if(reopenSelect){reopenSelect.addEventListener('change',()=>{document.getElementById('reopenReasonGroup').style.display=reopenSelect.value==='yes'?'block':'none';});}
+</script>
+{% if can_assign or can_update %}
+<script>
+{% if can_assign %}
+const assignmentDepartment=document.getElementById('assignmentDepartment');
+const assignmentOfficer=document.getElementById('assignmentOfficer');
+function filterAssignmentOfficers(){
+    if(!assignmentDepartment || !assignmentOfficer) return;
+    const selectedId=assignmentDepartment.selectedOptions[0]?.dataset.departmentId || '';
+    Array.from(assignmentOfficer.options).forEach(option=>{
+        if(!option.value){ option.hidden=false; return; }
+        const matches=!selectedId || option.dataset.departmentId===selectedId;
+        option.hidden=!matches;
+        if(!matches && option.selected) assignmentOfficer.value='';
+    });
+}
+assignmentDepartment?.addEventListener('change',filterAssignmentOfficers);
+filterAssignmentOfficers();
+
+document.getElementById('assignmentForm')?.addEventListener('submit', async e => {
+    e.preventDefault();
+    const f = e.target;
+    const response = await fetch('/api/request/{{ complaint.request_id }}/assign', {
+        method:'PUT',
+        headers:{'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token }}'},
+        body: JSON.stringify({
+            department:f.department.value,
+            department_id:f.department.selectedOptions[0]?.dataset.departmentId || null,
+            officer_id:f.officer_id.value || null,
+            due_at:f.due_at.value || ''
+        })
+    });
+    const data = await response.json();
+    if (data.success) location.reload(); else alert(data.error || 'Assignment failed.');
+});
+{% endif %}
+document.getElementById('reviewForm')?.addEventListener('submit', async e => {
+    e.preventDefault();
+    const form = e.target;
+    const response = await fetch('/api/request/{{ complaint.request_id }}/review', {
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token }}'},
+        body:JSON.stringify({decision:form.decision.value, modification:form.modification.value.trim()})
+    });
+    const data = await response.json();
+    if (data.success) location.reload(); else alert(data.error || 'Review could not be saved.');
+});
+
+async function savePriorityOverride() {
+    const value = document.getElementById('priorityOverride')?.value;
+    if (!value) return true;
+    const r = await fetch('/api/request/{{ complaint.request_id }}/priority', {method:'PUT', headers:{'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token }}'}, body:JSON.stringify({priority:value})});
+    const d = await r.json();
+    if (!d.success) { alert(d.error || 'Priority update failed.'); return false; }
+    return true;
+}
+function previewImage(input, targetId) {
+    const target=document.getElementById(targetId); if(!target) return; target.innerHTML='';
+    const file=input.files?.[0]; if(!file || !file.type.startsWith('image/')) return;
+    const img=document.createElement('img'); img.style.maxWidth='220px'; img.style.maxHeight='180px'; img.style.marginTop='8px'; img.style.borderRadius='8px';
+    img.src=URL.createObjectURL(file); target.appendChild(img);
+}
+document.getElementById('beforeEvidence')?.addEventListener('change', e=>previewImage(e.target,'beforePreview'));
+document.getElementById('afterEvidence')?.addEventListener('change', e=>previewImage(e.target,'afterPreview'));
+document.getElementById('officerUpdateForm')?.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!(await savePriorityOverride())) return;
+    const response = await fetch('/api/request/{{ complaint.request_id }}/update', {method:'POST', body:new FormData(e.target)});
+    const data = await response.json();
+    if (data.success) location.reload(); else alert(data.error || 'Update failed.');
+});
+</script>
+{% endif %}
+{% endblock %}

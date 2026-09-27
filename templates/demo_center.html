@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Demo Center - CivicPulse AI{% endblock %}
+{% block content %}
+<div class="page-header"><h1>Hack2Skill Demo Center</h1><p>Live journeys through the existing CivicPulse AI application.</p></div>
+<div class="container"><div class="dashboard-grid">
+{% for title, href, desc in journeys %}
+<div class="chart-card"><h2>{{ title }}</h2><p>{{ desc }}</p><a class="btn btn-primary" href="{{ href }}">Open live journey</a></div>
+{% endfor %}
+<div class="chart-card"><h2>Development Impact</h2><p>Measured outcomes, SLA performance, satisfaction and demand hotspots.</p><a class="btn btn-primary" href="{{ url_for('impact_dashboard') }}">Open Impact Dashboard</a></div>
+<div class="chart-card"><h2>Civic Insight</h2><p>Data-grounded AI-assisted summary for a selected area and period.</p><a class="btn btn-primary" href="{{ url_for('civic_insight') }}">Open Civic Insight</a></div>
+<div class="chart-card"><h2>System Status</h2><p>See which implemented CivicPulse modules are operational.</p><a class="btn btn-secondary" href="{{ url_for('system_status') }}">Open Status</a></div>
+<div class="chart-card"><h2>Public Transparency</h2><p>Privacy-preserving aggregate civic statistics.</p><a class="btn btn-secondary" href="{{ url_for('public_transparency') }}">Open Transparency</a></div>
+</div><div class="chart-card"><h2>Demo accounts</h2><p>Citizen: <code>demo_citizen</code> / <code>demo123</code></p><p>Officer: <code>demo_officer</code> / <code>demo123</code></p><p>Admin: <code>demo_admin</code> / <code>demo123</code></p><p>These are synthetic hackathon accounts only.</p></div></div>
+{% endblock %}

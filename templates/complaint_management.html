@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}Complaint Management - CivicPulse AI{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Complaint Management</h1>
+    <p>Search and filter the complaints you are authorized to manage.</p>
+</div>
+
+<div class="container">
+    <div class="chart-card">
+        <h2>Advanced Search &amp; Filters</h2>
+        <form method="GET" class="filter-form">
+            <div class="filter-row" style="flex-wrap:wrap;">
+                <input class="filter-input" type="text" name="complaint_id" placeholder="Complaint ID" value="{{ filters.complaint_id }}">
+                <input class="filter-input" type="search" name="keyword" placeholder="Keyword in ID, title or description" value="{{ filters.keyword }}">
+                <select class="filter-input" name="category">
+                    <option value="">All Categories</option>
+                    {% for item in categories %}<option value="{{ item }}" {% if filters.category == item %}selected{% endif %}>{{ item }}</option>{% endfor %}
+                </select>
+                <select class="filter-input" name="status">
+                    <option value="">All Statuses</option>
+                    {% for item in statuses %}<option value="{{ item }}" {% if filters.status == item %}selected{% endif %}>{{ item }}</option>{% endfor %}
+                </select>
+                <select class="filter-input" name="priority">
+                    <option value="">All Priorities</option>
+                    {% for item in priorities %}<option value="{{ item }}" {% if filters.priority == item %}selected{% endif %}>{{ item }}</option>{% endfor %}
+                </select>
+                <select class="filter-input" name="department">
+                    <option value="">All Departments</option>
+                    {% for item in departments %}<option value="{{ item }}" {% if filters.department == item %}selected{% endif %}>{{ item }}</option>{% endfor %}
+                </select>
+                <select class="filter-input" name="officer">
+                    <option value="">All Officers</option>
+                    {% for item in officers %}<option value="{{ item.id }}" {% if filters.officer == item.id|string %}selected{% endif %}>{{ item.username }}</option>{% endfor %}
+                </select>
+                <input class="filter-input" type="text" name="location" placeholder="State, district or ward/area" value="{{ filters.location }}">
+                <select class="filter-input" name="language" aria-label="Filter by language">
+                    <option value="">All Languages</option>
+                    {% for code, label in [('en','English'),('ta','Tamil'),('hi','Hindi'),('te','Telugu'),('ka','Kannada'),('ml','Malayalam')] %}
+                    <option value="{{ code }}" {% if filters.language == code %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                <label class="filter-input">From <input type="date" name="start_date" value="{{ filters.start_date }}"></label>
+                <label class="filter-input">To <input type="date" name="end_date" value="{{ filters.end_date }}"></label>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px;">
+                <button type="submit" class="btn btn-primary">Search</button>
+                <a class="btn btn-outline" href="{{ request.path }}">Clear</a>
+                <label>Rows per page
+                    <select name="per_page" onchange="this.form.submit()">
+                        {% for n in [10,20,50,100] %}<option value="{{ n }}" {% if pagination.per_page == n %}selected{% endif %}>{{ n }}</option>{% endfor %}
+                    </select>
+                </label>
+            </div>
+        </form>
+    </div>
+
+    <div class="chart-card">
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
+            <div>
+                <h2>Complaint Results</h2>
+                <p class="review-note">{{ pagination.total }} matching complaint{{ '' if pagination.total == 1 else 's' }}. Only the current page is loaded.</p>
+            </div>
+            {% if pagination.total %}<span class="status-badge">{{ pagination.page }} / {{ pagination.pages }} pages</span>{% endif %}
+        </div>
+        <div style="overflow:auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Complaint ID</th>
+                        <th>Category</th>
+                        <th>Location</th>
+                        <th>Status</th>
+                        <th>Priority</th>
+                        <th>Department</th>
+                        <th>Language</th>
+                        <th>Officer</th>
+                        <th>Due date</th>
+                        <th>Remaining / SLA</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for row in rows %}
+                    {% set c = row.complaint %}
+                    {% set sla = row.sla %}
+                    {% set priority = c.analysis.priority_override if c.analysis and c.analysis.priority_override else (c.analysis.priority if c.analysis else 'Low') %}
+                    <tr class="{% if sla.status in ['Overdue','Breached'] %}sla-row-overdue{% endif %}">
+                        <td><a href="{{ url_for('complaint_details', request_id=c.request_id) }}">{{ c.request_id }}</a><br><small>{{ c.title or '' }}</small></td>
+                        <td>{{ c.analysis.category_classified if c.analysis and c.analysis.category_classified else c.category }}</td>
+                        <td>{{ c.local_area }}, {{ c.district }}</td>
+                        <td><span class="status-badge status-{{ c.status|lower|replace(' ','-') }}">{{ c.status }}</span></td>
+                        <td>{{ priority }}</td>
+                        <td>
+                            {% if row.assignment.official_department %}
+                                <strong>{{ row.assignment.official_department }}</strong>
+                            {% elif row.assignment.ai_recommended_department %}
+                                <span>{{ row.assignment.ai_recommended_department }}</span><br><small>AI recommendation • Official assignment pending</small>
+                            {% else %}
+                                <span>Unassigned</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ c.language_override or c.original_language or c.language or 'en' }}</td>
+                        <td>{{ c.assigned_officer.username if c.assigned_officer else 'Not Assigned' }}</td>
+                        <td>{{ c.due_at.strftime('%Y-%m-%d %H:%M') if c.due_at else '—' }}</td>
+                        <td>
+                            <span class="{% if sla.status in ['Overdue','Breached'] %}sla-overdue{% elif sla.status == 'Compliant' %}sla-compliant{% endif %}">
+                                {% if sla.remaining_seconds is not none %}
+                                    <span class="sla-countdown" data-seconds="{{ sla.remaining_seconds }}">{{ sla.status }}</span>
+                                {% else %}{{ sla.status }}{% endif %}
+                            </span>
+                        </td>
+                        <td>{{ c.created_at.strftime('%Y-%m-%d %H:%M') if c.created_at else '—' }}</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="11">No complaints match the selected filters.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if pagination.pages > 1 %}
+        <div class="pagination" style="display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;margin-top:20px;">
+            {% if pagination.has_prev %}<a class="btn btn-sm btn-outline" href="{{ request.path }}?{{ pagination_query }}{% if pagination_query %}&{% endif %}page={{ pagination.prev_num }}">Previous</a>{% endif %}
+            {% for p in pagination.iter_pages(left_edge=1,left_current=2,right_current=2,right_edge=1) %}
+                {% if p %}
+                    <a class="btn btn-sm {% if p == pagination.page %}btn-primary{% else %}btn-outline{% endif %}" href="{{ request.path }}?{{ pagination_query }}{% if pagination_query %}&{% endif %}page={{ p }}">{{ p }}</a>
+                {% else %}<span>…</span>{% endif %}
+            {% endfor %}
+            {% if pagination.has_next %}<a class="btn btn-sm btn-outline" href="{{ request.path }}?{{ pagination_query }}{% if pagination_query %}&{% endif %}page={{ pagination.next_num }}">Next</a>{% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+    function formatRemaining(seconds) {
+        const abs = Math.abs(seconds);
+        const days = Math.floor(abs / 86400);
+        const hours = Math.floor((abs % 86400) / 3600);
+        const minutes = Math.floor((abs % 3600) / 60);
+        if (days) return `${days}d ${hours}h`;
+        if (hours) return `${hours}h ${minutes}m`;
+        return `${minutes}m`;
+    }
+    document.querySelectorAll('.sla-countdown').forEach(el => {
+        let seconds = Number(el.dataset.seconds || 0);
+        const status = el.textContent.trim();
+        const tick = () => {
+            if (status === 'Compliant' || status === 'Breached') {
+                el.textContent = status;
+                return;
+            }
+            el.textContent = seconds < 0 ? `Overdue by ${formatRemaining(seconds)}` : `${formatRemaining(seconds)} remaining`;
+            seconds -= 60;
+        };
+        tick();
+        window.setInterval(tick, 60000);
+    });
+})();
+</script>
+{% endblock %}

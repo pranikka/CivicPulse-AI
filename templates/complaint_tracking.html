@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Track Complaint - CivicPulse AI{% endblock %}
+{% block content %}
+<div class="page-header"><h1>Track Complaint</h1><p>Enter your unique complaint ID to view the latest authorized status.</p></div>
+<div class="container">
+    <div class="form-card">
+        <form method="POST" class="citizen-form">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            <div class="form-group">
+                <label for="request_id">Complaint ID</label>
+                <input id="request_id" name="request_id" required maxlength="20" placeholder="e.g. CP-ABC123XYZ" value="{{ complaint.request_id if complaint else '' }}">
+            </div>
+            <button class="btn btn-primary" type="submit">Track Complaint</button>
+        </form>
+    </div>
+    {% if complaint %}
+    <div class="request-card" style="margin-top:24px;">
+        <div class="request-header">
+            <h3>{{ complaint.title or complaint.request_id }}</h3>
+            <span>{{ complaint.request_id }}</span>
+            <span class="status-badge status-{{ complaint.status|lower }}">{{ complaint.status }}</span>
+        </div>
+        <div class="request-meta">
+            <p><strong>Category:</strong> {{ complaint.category }}</p>
+            <p><strong>Submitted:</strong> {{ complaint.created_at.strftime('%B %d, %Y at %I:%M %p') }}</p>
+            <p><strong>Priority:</strong> {{ (complaint.analysis.priority_override or complaint.analysis.priority) if complaint.analysis else 'Pending analysis' }}</p>
+            <p><strong>Department:</strong> {{ complaint.assigned_department or (complaint.analysis.recommended_department if complaint.analysis else 'Not assigned') }}</p>
+            {% if complaint.assigned_officer %}<p><strong>Assigned Officer:</strong> {{ complaint.assigned_officer.username }}</p>{% endif %}
+            <p><strong>Last update:</strong> {{ complaint.updated_at.strftime('%B %d, %Y at %I:%M %p') if complaint.updated_at else '—' }}</p>
+            {% if complaint.resolved_at %}<p><strong>Resolved:</strong> {{ complaint.resolved_at.strftime('%B %d, %Y at %I:%M %p') }}</p>{% endif %}
+        </div>
+        <a class="btn btn-sm btn-outline" href="{{ url_for('complaint_details', request_id=complaint.request_id) }}">View Full Timeline</a>
+    </div>
+
+    <div class="chart-card" style="margin-top:24px;">
+        <h2>Request Lifecycle</h2>
+        <div class="timeline">
+        {% for item in lifecycle_events %}
+            <div class="timeline-item" style="padding:14px 0;border-bottom:1px solid #eee;">
+                <strong>{{ item.label }}</strong>
+                <p>{{ item.description }}</p>
+                <small>{{ item.created_at.strftime('%B %d, %Y at %I:%M %p') }}</small>
+            </div>
+        {% endfor %}
+        </div>
+        <p class="form-hint">Officer names, contact details and internal review information are not shown on this citizen tracking view.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

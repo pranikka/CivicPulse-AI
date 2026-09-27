@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}SLA Settings - CivicPulse AI{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>SLA Resolution Targets</h1>
+    <p>Configure resolution targets used for complaint due dates and SLA compliance.</p>
+</div>
+<div class="container">
+    <div class="form-card">
+        <form method="POST">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            <div class="form-group">
+                <label for="target-Critical">Critical target (hours)</label>
+                <input id="target-Critical" type="number" min="1" max="8760" name="target_Critical" value="{{ configs.Critical }}" required>
+            </div>
+            <div class="form-group">
+                <label for="target-High">High target (hours)</label>
+                <input id="target-High" type="number" min="1" max="8760" name="target_High" value="{{ configs.High }}" required>
+            </div>
+            <div class="form-group">
+                <label for="target-Medium">Medium target (hours)</label>
+                <input id="target-Medium" type="number" min="1" max="8760" name="target_Medium" value="{{ configs.Medium }}" required>
+            </div>
+            <div class="form-group">
+                <label for="target-Low">Low target (hours)</label>
+                <input id="target-Low" type="number" min="1" max="8760" name="target_Low" value="{{ configs.Low }}" required>
+            </div>
+            <button class="btn btn-primary" type="submit">Save SLA Targets</button>
+        </form>
+        <p class="review-note" style="margin-top:16px;">
+            Existing complaint due dates are preserved when these settings change. New complaints use the applicable target.
+            Authorized staff can still set a specific due date during assignment.
+        </p>
+    </div>
+</div>
+{% endblock %}

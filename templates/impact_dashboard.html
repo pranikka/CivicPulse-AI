@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Development Impact Dashboard - CivicPulse AI{% endblock %}
+{% block content %}
+<div class="page-header"><h1>Development Impact Dashboard</h1><p>Measured outcomes from available CivicPulse records. No synthetic impact values are used.</p></div>
+<div class="container">
+<div class="chart-card">
+<form method="get" class="filter-form"><select class="filter-input" name="period"><option value="7d" {% if period=='7d' %}selected{% endif %}>7 days</option><option value="30d" {% if period=='30d' %}selected{% endif %}>30 days</option><option value="90d" {% if period=='90d' %}selected{% endif %}>90 days</option><option value="365d" {% if period=='365d' %}selected{% endif %}>1 year</option></select><button class="btn btn-primary" type="submit">Apply</button></form>
+</div>
+<div class="dashboard-stats">
+{% set cards=[('Requests received',metrics.requests_received),('Requests resolved',metrics.requests_resolved),('Average resolution', (metrics.average_resolution_hours|string+' h') if metrics.average_resolution_hours is not none else 'Not enough data'),('SLA compliance',(metrics.sla_compliance|string+'%') if metrics.sla_compliance is not none else 'Not enough data'),('High-priority issues addressed',metrics.high_priority_issues_addressed),('Citizen satisfaction',(metrics.citizen_satisfaction|string+'/5') if metrics.citizen_satisfaction is not none else 'Not enough data'),('Repeat issue rate',(metrics.repeat_issue_rate|string+'%') if metrics.repeat_issue_rate is not none else 'Not enough data')] %}
+{% for label,value in cards %}<div class="stat-card"><div class="stat-content"><div class="stat-value">{{ value }}</div><div class="stat-label">{{ label }}</div></div></div>{% endfor %}
+</div>
+<div class="dashboard-grid">
+<div class="chart-card"><h2>Active demand hotspots</h2>{% if metrics.active_hotspots %}<table><tr><th>Area</th><th>Requests</th></tr>{% for area,count in metrics.active_hotspots %}<tr><td>{{ area }}</td><td>{{ count }}</td></tr>{% endfor %}</table>{% else %}<p>Not enough data.</p>{% endif %}</div>
+<div class="chart-card"><h2>Data coverage</h2><p>Records: {{ quality.records }}</p><p>Date coverage: {{ quality.date_min or '—' }} to {{ quality.date_max or '—' }}</p><p>Missing location: {{ quality.missing_location_pct|default(0) }}%</p><p>Missing category: {{ quality.missing_category_pct|default(0) }}%</p><p class="review-note">Measured outcomes are separated from AI-generated insights.</p></div>
+</div>
+</div>{% endblock %}

@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}My Requests - CivicPulse AI{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <h1>My Requests</h1>
+    <p>Track your submitted citizen requests</p>
+</div>
+
+<div class="container">
+    {% if requests %}
+        <div class="requests-list">
+            {% for request in requests %}
+                <div class="request-card">
+                    <div class="request-header">
+                        <h3>{{ request.title or request.request_id }}</h3>
+                        <small>{{ request.request_id }}</small>
+                        <span class="status-badge status-{{ request.status|lower }}">{{ request.status }}</span>
+                    </div>
+                    
+                    <div class="request-meta">
+                        <p><strong>Category:</strong> {{ request.category }}</p>
+                        <p><strong>Location:</strong> {{ request.local_area }}, {{ request.district }}, {{ request.state }}</p>
+                        <p><strong>Submitted:</strong> {{ request.created_at.strftime('%B %d, %Y at %I:%M %p') }}</p>
+                    </div>
+                    
+                    <div class="request-description">
+                        <p><strong>Original citizen statement:</strong> {{ request.original_text or request.description }}</p>
+                        {% if request.normalized_text and request.normalized_text != request.original_text %}
+                        <p><strong>Normalized text:</strong> {{ request.normalized_text }}</p>
+                        {% endif %}
+                        <p><strong>Language:</strong> {{ request.language_override or request.original_language or request.language or 'en' }}</p>
+                        <p><strong>Input:</strong> {{ request.input_mode or 'text' }}{% if request.voice_transcript %} — voice transcription stored{% endif %}</p>
+                    </div>
+                    
+                    {% if request.analysis %}
+                        <div class="analysis-result">
+                            <h4>AI Analysis Complete</h4>
+                            <div class="analysis-grid">
+                                <div class="analysis-item">
+                                    <span class="analysis-label">Category</span>
+                                    <span class="analysis-value">{{ request.analysis.category_classified }}</span>
+                                </div>
+                                <div class="analysis-item">
+                                    <span class="analysis-label">Issue Type</span>
+                                    <span class="analysis-value">{{ request.analysis.issue_type or '—' }}</span>
+                                </div>
+                                <div class="analysis-item">
+                                    <span class="analysis-label">Priority</span>
+                                    <span class="analysis-value urgency-{{ ((request.analysis.priority_override or request.analysis.priority) if request.analysis else 'Low')|lower }}">{{ (request.analysis.priority_override or request.analysis.priority) if request.analysis else '—' }}</span>
+                                </div>
+                                <div class="analysis-item">
+                                    <span class="analysis-label">Urgency</span>
+                                    <span class="analysis-value urgency-{{ request.analysis.urgency_level|lower }}">{{ request.analysis.urgency_level }}</span>
+                                </div>
+                                <div class="analysis-item">
+                                    <span class="analysis-label">Department</span>
+                                    <span class="analysis-value">{{ request.analysis.recommended_department or '—' }}</span>
+                                </div>
+                                <div class="analysis-item">
+                                    <span class="analysis-label">Sentiment</span>
+                                    <span class="analysis-value">{{ request.analysis.sentiment or '—' }}</span>
+                                </div>
+                                <div class="analysis-item">
+                                    <span class="analysis-label">Category confidence</span>
+                                    <span class="analysis-value">{{ ((request.analysis.confidence_details or {}).get('category', request.analysis.confidence_score or 0) * 100)|round(0)|int }}%</span>
+                                </div>
+                                <div class="analysis-item">
+                                    <span class="analysis-label">Urgency confidence</span>
+                                    <span class="analysis-value">{{ ((request.analysis.confidence_details or {}).get('urgency', request.analysis.confidence_score or 0) * 100)|round(0)|int }}%</span>
+                                </div>
+                                <div class="analysis-item">
+                                    <span class="analysis-label">Priority confidence</span>
+                                    <span class="analysis-value">{{ ((request.analysis.confidence_details or {}).get('priority', request.analysis.confidence_score or 0) * 100)|round(0)|int }}%</span>
+                                </div>
+                                <div class="analysis-item">
+                                    <span class="analysis-label">Recommendation confidence</span>
+                                    <span class="analysis-value">
+                                        {{ ((request.analysis.confidence_details or {}).get('recommendation', request.analysis.confidence_score or 0) * 100)|round(0)|int }}%
+                                        {% if ((request.analysis.confidence_details or {}).get('recommendation', request.analysis.confidence_score or 0)) < 0.60 %}
+                                        <small>Low AI confidence — human review recommended.</small>
+                                        {% endif %}
+                                    </span>
+                                </div>
+                                <div class="analysis-item">
+                                    <span class="analysis-label">Infrastructure Gap</span>
+                                    <span class="analysis-value">{{ request.analysis.infrastructure_gap }}/10</span>
+                                </div>
+                                <div class="analysis-item">
+                                    <span class="analysis-label">Similar Requests</span>
+                                    <span class="analysis-value">{{ request.analysis.similar_requests_count }}</span>
+                                </div>
+                            </div>
+                            
+                            <div class="recommendation-box">
+                                <h5>AI Recommendation</h5>
+                                <p><strong>Review status:</strong> {{ request.analysis.review_status or 'Review Required' }}</p>
+                                <p>{{ request.analysis.ai_recommendation }}</p>
+                                <p class="review-note">🔍 AI-generated recommendation • Human review required</p>
+                            </div>
+                            
+                            {% if request.analysis.explainability_factors %}
+                                <div class="explainability">
+                                    <h5>Why This Recommendation?</h5>
+                                    <ul>
+                                        {% for factor, reason in request.analysis.explainability_factors.items() %}
+                                            <li><strong>{{ factor.replace('_', ' ')|title }}:</strong> {{ reason }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            {% endif %}
+                            {% set explanation = explanations.get(request.request_id, {}) %}
+                            <div class="explainability">
+                                <h5>Historical Similarity & Evidence</h5>
+                                <p>Similar requests: {{ explanation.signals.similar_requests if explanation else request.analysis.similar_requests_count }}</p>
+                                {% if explanation.similar_requests %}
+                                <table><tr><th>Request</th><th>Similarity</th><th>Category</th><th>Area</th></tr>
+                                {% for row in explanation.similar_requests %}
+                                <tr><td>{{ row.request_id }}</td><td>{{ row.similarity }}%</td><td>{{ row.category }}</td><td>{{ row.location }}</td></tr>
+                                {% endfor %}</table>
+                                {% else %}<p>No sufficiently similar historical request was identified in the available dataset.</p>{% endif %}
+                                <p class="review-note">AI-generated recommendation • Human review required.</p>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="analysis-pending">
+                            <p>⏳ AI analysis is in progress. This typically takes a few seconds.</p>
+                            <button class="btn btn-secondary btn-sm" onclick="location.reload()">Refresh Page</button>
+                        </div>
+                    {% endif %}
+                    
+                    {% if request.photo_filename or request.video_filename or request.evidence_filename %}
+                        <div class="request-description">
+                            <strong>Evidence:</strong>
+                            {% if request.photo_filename %}<a href="{{ url_for('complaint_media', filename=request.photo_filename) }}" target="_blank" rel="noopener">Photo</a>{% endif %}
+                            {% if request.video_filename %} · <a href="{{ url_for('complaint_media', filename=request.video_filename) }}" target="_blank" rel="noopener">Video</a>{% endif %}
+                            {% if request.evidence_filename %} · <a href="{{ url_for('complaint_media', filename=request.evidence_filename) }}" target="_blank" rel="noopener">Document</a>{% endif %}
+                        </div>
+                    {% endif %}
+
+                    {% if not request.is_anonymous and (request.contact_phone or request.contact_email) %}
+                        <div class="request-meta">
+                            {% if request.contact_phone %}<p><strong>Contact:</strong> {{ request.contact_phone }}</p>{% endif %}
+                            {% if request.contact_email %}<p><strong>Email:</strong> {{ request.contact_email }}</p>{% endif %}
+                        </div>
+                    {% endif %}
+
+                    <div class="request-actions">
+                        <a href="{{ url_for('complaint_details', request_id=request.request_id) }}" class="btn btn-sm btn-outline">View Details</a>
+                        <button onclick="shareTracking('{{ request.request_id }}')" class="btn btn-sm btn-outline">Share Tracking ID</button>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <div class="empty-icon">📋</div>
+            <h2>No Requests Yet</h2>
+            <p>You haven't submitted any citizen requests yet. Start by sharing your infrastructure needs!</p>
+            <a href="/citizen/request" class="btn btn-primary">Submit Your First Request</a>
+        </div>
+    {% endif %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function shareTracking(requestId) {
+        const text = `Track my CivicPulse AI request: ${requestId}`;
+        if (navigator.share) {
+            navigator.share({
+                title: 'CivicPulse AI Request',
+                text: text
+            });
+        } else {
+            alert('Your tracking ID: ' + requestId);
+        }
+    }
+</script>
+{% endblock %}

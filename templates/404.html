@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Page Not Found - CivicPulse AI{% endblock %}
+
+{% block content %}
+
+<div class="error-container">
+    <div class="error-card">
+        <div class="error-code">404</div>
+        <h1>Page Not Found</h1>
+        <p>The page you're looking for doesn't exist or has been moved.</p>
+        
+        <div class="error-suggestions">
+            <h3>What you can do:</h3>
+            <ul>
+                <li><a href="/">Go back to Home</a></li>
+                <li><a href="/auth/login">Login to your account</a></li>
+                <li><a href="/citizen/request">Submit a request</a></li>
+                <li><a href="mailto:support@civicpulse.ai">Contact Support</a></li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
